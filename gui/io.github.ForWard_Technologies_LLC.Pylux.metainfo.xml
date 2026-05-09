@@ -22,11 +22,11 @@
   <screenshots>
     <screenshot type="default">
       <caption>Browse your game catalog for internet play streaming</caption>
-      <image type="source">https://raw.githubusercontent.com/ForWard-Technologies-LLC/Pylux/master/gui/screenshots/01-cloud-play.jpg</image>
+      <image type="source">https://raw.githubusercontent.com/ForWard-Technologies-LLC/Pylux/4390eb61e4d65e770e94164beb106d5f42c16a14/gui/screenshots/01-cloud-play.jpg</image>
     </screenshot>
     <screenshot>
       <caption>Auto-discover and connect to your PlayStation console</caption>
-      <image type="source">https://raw.githubusercontent.com/ForWard-Technologies-LLC/Pylux/master/gui/screenshots/02-remote-play.jpg</image>
+      <image type="source">https://raw.githubusercontent.com/ForWard-Technologies-LLC/Pylux/4390eb61e4d65e770e94164beb106d5f42c16a14/gui/screenshots/02-remote-play.jpg</image>
     </screenshot>
   </screenshots>
   <content_rating type="oars-1.1" />
