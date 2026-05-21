@@ -16,6 +16,19 @@
 
 <a href="https://flathub.org/apps/io.github.ForWard_Technologies_LLC.Pylux"><img src="assets/flathub-badge.svg" height="50" alt="Get it on Flathub"></a>&nbsp;<a href="https://www.dropbox.com/scl/fi/wi8bjilwiklv7fde0b4ea/pylux-latest.AppImage?rlkey=3xne4ltuiq54ogfmng4gq24mp&dl=1"><img src="assets/linux-appimage-badge.svg" height="50" alt="Download AppImage"></a>
 
+**Steam Deck / Flathub Note**:
+
+Pylux is not available in the Steam Deck Discover store yet. Flathub’s review process is slow, so until the listing is approved you need to install it manually using the commands below. I will remove this section once Pylux is available on Flathub.
+
+Install:
+```
+curl -fsSL -o pylux-latest.flatpak "https://www.dropbox.com/scl/fi/zho2yrnso8u28rbx0jkwt/pylux-latest.flatpak?rlkey=kjftxhac24g43li6vpouqding&dl=1" && flatpak install --user -y pylux-latest.flatpak
+```
+Run:
+```
+flatpak run io.github.ForWard_Technologies_LLC.Pylux
+```
+
 For full release notes and all downloads see the [Releases page](https://github.com/ForWard-Technologies-LLC/Pylux/releases).
 
 ## Screenshots
