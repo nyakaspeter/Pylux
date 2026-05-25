@@ -2969,7 +2969,6 @@ DialogView {
                             value: Chiaki.settings.cloudBitratePSCloud / 1000
                             onMoved: Chiaki.settings.cloudBitratePSCloud = value * 1000
                             KeyNavigation.up: datacenterPSCloud
-                            KeyNavigation.down: cloudBitratePSCloud
                             KeyNavigation.priority: KeyNavigation.BeforeItem
                             lastInFocusChain: selectedCloudService == SettingsDialog.CloudService.PSCloud
                         }
@@ -3012,7 +3011,6 @@ DialogView {
                             value: Chiaki.settings.cloudBitratePSNOW / 1000
                             onMoved: Chiaki.settings.cloudBitratePSNOW = value * 1000
                             KeyNavigation.up: datacenterPSNOW
-                            KeyNavigation.down: cloudBitratePSNOW
                             KeyNavigation.priority: KeyNavigation.BeforeItem
                             lastInFocusChain: selectedCloudService == SettingsDialog.CloudService.PSNOW
                         }

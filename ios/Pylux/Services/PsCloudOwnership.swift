@@ -67,7 +67,7 @@ enum PsCloudOwnership {
             if !game.id.isEmpty { ownedIds.insert(game.id) }
         }
 
-        let ownedByCatalogId = Dictionary(uniqueKeysWithValues: ownedCrossRef.map { ($0.id, $0) })
+        let ownedByCatalogId = Dictionary(ownedCrossRef.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
         return publicCatalog.map { cat in
             var game = cat

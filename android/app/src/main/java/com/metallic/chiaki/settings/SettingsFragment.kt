@@ -383,23 +383,24 @@ class SettingsFragment: PreferenceFragmentCompat(), TitleFragment
 		.show()
 	}
 
-	/**
-	 * Populate cloud datacenter dropdown from saved ping results JSON
-	 * Matches Qt behavior of showing discovered datacenters with their ping times
-	 */
 	private fun bindCloudBitratePreference(preference: SeekBarPreference?)
 	{
 		if (preference == null) return
 		val summaryRes = when (preference.key)
 		{
 			preferences.cloudBitratePsnowKey -> R.string.preferences_cloud_bitrate_psnow_summary
-			else -> R.string.preferences_cloud_bitrate_pscloud_summary
+			preferences.cloudBitratePscloudKey -> R.string.preferences_cloud_bitrate_pscloud_summary
+			else -> return
 		}
 		preference.summaryProvider = Preference.SummaryProvider<SeekBarPreference> { pref ->
 			getString(summaryRes, pref.value)
 		}
 	}
 
+	/**
+	 * Populate cloud datacenter dropdown from saved ping results JSON
+	 * Matches Qt behavior of showing discovered datacenters with their ping times
+	 */
 	private fun populateCloudDatacenterPreference(preference: ListPreference?, datacentersJson: String)
 	{
 		if (preference == null) return

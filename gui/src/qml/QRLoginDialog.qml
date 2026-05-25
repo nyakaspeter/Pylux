@@ -224,10 +224,12 @@ DialogView {
                                 id: qrCodeImage
                                 anchors.fill: parent
                                 anchors.margins: 10
-                                property int qrSize: Math.max(128, Math.round(Math.min(width, height)))
+                                readonly property int qrSize: 350
                                 source: "https://api.qrserver.com/v1/create-qr-code/?size=" + qrSize + "x" + qrSize + "&data=" + encodeURIComponent(Chiaki.getPyluxURL() + "/psstream/?psstream_code=" + dialog.qrCode)
                                 fillMode: Image.PreserveAspectFit
-                                cache: false
+                                sourceSize.width: qrSize
+                                sourceSize.height: qrSize
+                                cache: true
 
                                 BusyIndicator {
                                     anchors.centerIn: parent
@@ -273,6 +275,7 @@ DialogView {
                         spacing: 20
 
                         C.Button {
+                            id: checkButton
                             text: qsTr("Check Status")
                             Layout.preferredWidth: 140
                             Layout.preferredHeight: 40

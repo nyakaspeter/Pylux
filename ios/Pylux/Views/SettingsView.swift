@@ -552,22 +552,7 @@ struct SettingsView: View {
     }
 
     private func cloudBitrateSlider(bitrateKbps: Binding<Int>, label: String) -> some View {
-        let mbpsBinding = Binding<Double>(
-            get: { Double(bitrateKbps.wrappedValue) / 1000.0 },
-            set: { newValue in
-                bitrateKbps.wrappedValue = StreamPreferences.clampCloudBitrateKbps(Int(newValue * 1000))
-                prefs.save()
-            }
-        )
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(label)
-                Spacer()
-                Text("\(Int(mbpsBinding.wrappedValue.rounded())) Mbps")
-                    .foregroundStyle(.secondary)
-            }
-            Slider(value: mbpsBinding, in: 2...200, step: 1)
-        }
+        CloudBitrateSlider(bitrateKbps: bitrateKbps, label: label, onCommit: { prefs.save() })
     }
 
     // MARK: - Datacenter Picker Helper
@@ -638,6 +623,37 @@ struct SettingsView: View {
         }
     }
 
+}
+
+private struct CloudBitrateSlider: View {
+    @Binding var bitrateKbps: Int
+    let label: String
+    let onCommit: () -> Void
+
+    var body: some View {
+        let mbpsBinding = Binding<Double>(
+            get: { Double(bitrateKbps) / 1000.0 },
+            set: { newValue in
+                bitrateKbps = StreamPreferences.clampCloudBitrateKbps(Int(newValue * 1000))
+            }
+        )
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(label)
+                Spacer()
+                Text("\(Int(mbpsBinding.wrappedValue.rounded())) Mbps")
+                    .foregroundStyle(.secondary)
+            }
+            Slider(
+                value: mbpsBinding,
+                in: 2...200,
+                step: 1,
+                onEditingChanged: { editing in
+                    if !editing { onCommit() }
+                }
+            )
+        }
+    }
 }
 
 // MARK: - Registered Hosts list (matches Android's SettingsRegisteredHostsFragment)
