@@ -20,11 +20,13 @@ class QmlSettings : public QObject
     Q_PROPERTY(QString cloudLanguagePSCloud READ cloudLanguagePSCloud WRITE setCloudLanguagePSCloud NOTIFY cloudLanguagePSCloudChanged)
     Q_PROPERTY(QString cloudDatacenterPSCloud READ cloudDatacenterPSCloud WRITE setCloudDatacenterPSCloud NOTIFY cloudDatacenterPSCloudChanged)
     Q_PROPERTY(QString cloudDatacentersJsonPSCloud READ cloudDatacentersJsonPSCloud NOTIFY cloudDatacentersJsonPSCloudChanged)
+    Q_PROPERTY(int cloudBitratePSCloud READ cloudBitratePSCloud WRITE setCloudBitratePSCloud NOTIFY cloudBitratePSCloudChanged)
     // PSNOW settings
     Q_PROPERTY(int cloudResolutionPSNOW READ cloudResolutionPSNOW WRITE setCloudResolutionPSNOW NOTIFY cloudResolutionPSNOWChanged)
     Q_PROPERTY(QString cloudLanguagePSNOW READ cloudLanguagePSNOW WRITE setCloudLanguagePSNOW NOTIFY cloudLanguagePSNOWChanged)
     Q_PROPERTY(QString cloudDatacenterPSNOW READ cloudDatacenterPSNOW WRITE setCloudDatacenterPSNOW NOTIFY cloudDatacenterPSNOWChanged)
     Q_PROPERTY(QString cloudDatacentersJsonPSNOW READ cloudDatacentersJsonPSNOW NOTIFY cloudDatacentersJsonPSNOWChanged)
+    Q_PROPERTY(int cloudBitratePSNOW READ cloudBitratePSNOW WRITE setCloudBitratePSNOW NOTIFY cloudBitratePSNOWChanged)
     Q_PROPERTY(int disconnectAction READ disconnectAction WRITE setDisconnectAction NOTIFY disconnectActionChanged)
     Q_PROPERTY(int suspendAction READ suspendAction WRITE setSuspendAction NOTIFY suspendActionChanged)
     Q_PROPERTY(bool logVerbose READ logVerbose WRITE setLogVerbose NOTIFY logVerboseChanged)
@@ -228,6 +230,8 @@ public:
     QString cloudDatacenterPSCloud() const;
     void setCloudDatacenterPSCloud(const QString &datacenter);
     QString cloudDatacentersJsonPSCloud() const;
+    int cloudBitratePSCloud() const;
+    void setCloudBitratePSCloud(int bitrate);
     // PSNOW settings
     int cloudResolutionPSNOW() const;
     void setCloudResolutionPSNOW(int resolution);
@@ -236,6 +240,8 @@ public:
     QString cloudDatacenterPSNOW() const;
     void setCloudDatacenterPSNOW(const QString &datacenter);
     QString cloudDatacentersJsonPSNOW() const;
+    int cloudBitratePSNOW() const;
+    void setCloudBitratePSNOW(int bitrate);
 
 #ifdef CHIAKI_GUI_ENABLE_STEAMDECK_NATIVE
     bool steamDeckHaptics() const;
@@ -646,10 +652,12 @@ signals:
     void cloudLanguagePSCloudChanged();
     void cloudDatacenterPSCloudChanged();
     void cloudDatacentersJsonPSCloudChanged();
+    void cloudBitratePSCloudChanged();
     void cloudResolutionPSNOWChanged();
     void cloudLanguagePSNOWChanged();
     void cloudDatacenterPSNOWChanged();
     void cloudDatacentersJsonPSNOWChanged();
+    void cloudBitratePSNOWChanged();
     void disconnectActionChanged();
     void suspendActionChanged();
     void logVerboseChanged();

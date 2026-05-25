@@ -14,6 +14,7 @@ final class CloudCatalogService {
 
     private static let cacheDuration: TimeInterval = 86400 // 24 hours
     private static let psnowCacheFile = "psnow_catalog.json"
+    private static let ps5PublicCacheFile = "ps5_cloud_catalog.json"
     private static let pscloudCacheFile = "pscloud_catalog.json"
     private static let pscloudOwnedCacheFile = "pscloud_owned.json"
 
@@ -66,7 +67,8 @@ final class CloudCatalogService {
             "productId": g.id, "name": g.name,
             "imageUrl": g.imageUrl, "landscapeImageUrl": g.landscapeImageUrl,
             "platform": g.platform, "serviceType": g.serviceType,
-            "conceptUrl": g.conceptUrl, "isOwned": g.isOwned
+            "conceptUrl": g.conceptUrl, "isOwned": g.isOwned,
+            "entitlementId": g.entitlementId, "storeProductId": g.storeProductId
         ]
     }
 
@@ -80,81 +82,30 @@ final class CloudCatalogService {
             platform: d["platform"] as? String ?? "ps4",
             serviceType: d["serviceType"] as? String ?? "psnow",
             conceptUrl: d["conceptUrl"] as? String ?? "",
-            isOwned: d["isOwned"] as? Bool ?? false
+            isOwned: d["isOwned"] as? Bool ?? false,
+            entitlementId: d["entitlementId"] as? String ?? "",
+            storeProductId: d["storeProductId"] as? String ?? ""
         )
     }
 
     // MARK: - PS5 Cloud Catalog (Public)
 
     /// Fetch PS5 Cloud catalog (public list of streamable PS5 games)
+    /// Mirrors CloudCatalogBackend::fetchPs5CloudCatalog — cache key ps5_cloud_catalog
     func fetchPs5CloudCatalog(locale: String = "en-us", forceRefresh: Bool = false) -> [CloudGame] {
-        if !forceRefresh, let cached = loadCachedGames(Self.pscloudCacheFile) {
+        if !forceRefresh, let cached = loadCachedGames(Self.ps5PublicCacheFile) {
             return cached
         }
 
-        os_log(.info, log: catalogLog, "=== Fetching PS5 Cloud Catalog ===")
-        let url = "https://www.playstation.com/bin/imagic/gameslist?locale=\(locale)&categoryList=all-ps5-list"
-
-        guard let response = CloudHttpClient.get(url: url, headers: [
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        ]), response.statusCode == 200 else {
-            os_log(.error, log: catalogLog, "PS5 catalog fetch failed")
-            return []
-        }
-
-        guard let data = response.body.data(using: .utf8),
-              let categories = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-            os_log(.error, log: catalogLog, "PS5 catalog: invalid JSON")
-            return []
-        }
-
-        var games: [CloudGame] = []
-        for category in categories {
-            guard let gameArray = category["games"] as? [[String: Any]] else { continue }
-            for gameObj in gameArray {
-                guard (gameObj["streamingSupported"] as? Bool) == true else { continue }
-                let productId = gameObj["productId"] as? String ?? ""
-                let name = gameObj["name"] as? String ?? "Unknown"
-                var imageUrl = gameObj["imageUrl"] as? String ?? ""
-                let conceptUrl = gameObj["conceptUrl"] as? String
-                    ?? gameObj["concept_url"] as? String
-                    ?? gameObj["url"] as? String ?? ""
-
-                if imageUrl.hasPrefix("http://") { imageUrl = imageUrl.replacingOccurrences(of: "http://", with: "https://") }
-
-                guard !productId.isEmpty else { continue }
-                games.append(CloudGame(
-                    productId: productId, name: name,
-                    imageUrl: imageUrl, landscapeImageUrl: imageUrl,
-                    platform: "ps5", serviceType: "pscloud",
-                    conceptUrl: conceptUrl, isOwned: false
-                ))
-            }
-        }
-
-        os_log(.info, log: catalogLog, "PS5 Cloud catalog: %d streaming games", games.count)
-        if !games.isEmpty { cacheGames(games, filename: Self.pscloudCacheFile) }
+        guard let games = fetchPs5CloudCatalogFromNetwork(locale: locale) else { return [] }
+        if !games.isEmpty { cacheGames(games, filename: Self.ps5PublicCacheFile) }
         return games
     }
 
-    // MARK: - PS5 Cloud Library: All Games (matches Android fetchPs5CloudCatalog with ownership)
-
-    /// Fetch ALL PS5 Cloud games with ownership flags.
-    /// Matches Android: repository.fetchPs5CloudCatalog() + crossReferenceOwnership()
-    /// Uses pscloudCacheFile (same cache as public catalog, but with ownership marked).
-    func fetchAllPs5CloudGames(npssoToken: String, locale: String = "en-us", forceRefresh: Bool = false) -> [CloudGame] {
-        // Check cache - pscloud_catalog.json stores ALL games with ownership already marked
-        if !forceRefresh, let cached = loadCachedGames(Self.pscloudCacheFile) {
-            // Verify cache has ownership info (check if any game has isOwned set)
-            return cached
-        }
-
-        os_log(.info, log: catalogLog, "=== Fetching ALL PS5 Cloud Games (with ownership) ===")
-
-        // Step 1: Fetch fresh public catalog (bypass our own cache since we're refreshing)
+    private func fetchPs5CloudCatalogFromNetwork(locale: String) -> [CloudGame]? {
+        os_log(.info, log: catalogLog, "=== Fetching PS5 Cloud Catalog ===")
         let url = "https://www.playstation.com/bin/imagic/gameslist?locale=\(locale)&categoryList=all-ps5-list"
+
         guard let response = CloudHttpClient.get(url: url, headers: [
             "Content-Type": "application/json",
             "Accept": "application/json",
@@ -163,7 +114,7 @@ final class CloudCatalogService {
               let data = response.body.data(using: .utf8),
               let categories = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
             os_log(.error, log: catalogLog, "PS5 catalog fetch failed")
-            return []
+            return nil
         }
 
         var games: [CloudGame] = []
@@ -177,7 +128,9 @@ final class CloudCatalogService {
                 let conceptUrl = gameObj["conceptUrl"] as? String
                     ?? gameObj["concept_url"] as? String
                     ?? gameObj["url"] as? String ?? ""
+
                 if imageUrl.hasPrefix("http://") { imageUrl = imageUrl.replacingOccurrences(of: "http://", with: "https://") }
+
                 guard !productId.isEmpty else { continue }
                 games.append(CloudGame(
                     productId: productId, name: name,
@@ -189,31 +142,39 @@ final class CloudCatalogService {
         }
 
         os_log(.info, log: catalogLog, "PS5 Cloud catalog: %d streaming games", games.count)
+        return games
+    }
 
-        // Step 2: Cross-reference ownership (matches Android crossReferenceOwnership)
-        var entitlementSet: Set<String> = []
-        if !npssoToken.isEmpty,
-           let oauthToken = fetchOwnedGamesOAuthToken(npssoToken: npssoToken) {
-            entitlementSet = Set(fetchEntitlements(oauthToken: oauthToken))
-            os_log(.info, log: catalogLog, "User owns %d entitlements", entitlementSet.count)
+    // MARK: - PS5 Cloud Library: All Games (matches Android fetchPs5CloudCatalog with ownership)
+
+    /// Fetch ALL PS5 Cloud games with ownership flags.
+    /// Mirrors Qt: fetchPs5CloudCatalog + getOwnedPs5CloudGames + CloudPlayView All tab
+    func fetchAllPs5CloudGames(npssoToken: String, locale: String = "en-us", forceRefresh: Bool = false) -> [CloudGame] {
+        if !forceRefresh, let cached = loadCachedGames(Self.pscloudCacheFile) {
+            return cached
         }
 
-        let allGames = games.map { game -> CloudGame in
-            var g = game
-            g.isOwned = entitlementSet.contains(game.id)
-            return g
-        }
+        os_log(.info, log: catalogLog, "=== Fetching ALL PS5 Cloud Games (with ownership) ===")
+
+        let publicCatalog = fetchPs5CloudCatalog(locale: locale, forceRefresh: forceRefresh)
+        guard !publicCatalog.isEmpty else { return [] }
+
+        let ownedCrossRef = getOwnedPs5CloudGames(npssoToken: npssoToken, publicCatalog: publicCatalog)
+        let allGames = PsCloudOwnership.markAllTabOwnership(
+            publicCatalog: publicCatalog,
+            ownedCrossRef: ownedCrossRef
+        )
 
         let ownedCount = allGames.filter { $0.isOwned }.count
         os_log(.info, log: catalogLog, "PS5 Library: %d total, %d owned", allGames.count, ownedCount)
+
         if !allGames.isEmpty { cacheGames(allGames, filename: Self.pscloudCacheFile) }
         return allGames
     }
 
-    // MARK: - PS5 Cloud Library: Owned Only (matches Android fetchOwnedPs5Games)
+    // MARK: - PS5 Cloud Library: Owned Only
 
-    /// Fetch ONLY owned PS5 Cloud games.
-    /// Matches Android: repository.fetchOwnedPs5Games()
+    /// Mirrors CloudCatalogBackend::getOwnedPs5CloudGames (owned tab)
     func fetchOwnedPs5Games(npssoToken: String, locale: String = "en-us", forceRefresh: Bool = false) -> [CloudGame] {
         if !forceRefresh, let cached = loadCachedGames(Self.pscloudOwnedCacheFile) {
             return cached
@@ -221,21 +182,30 @@ final class CloudCatalogService {
         guard !npssoToken.isEmpty else { return [] }
         os_log(.info, log: catalogLog, "=== Fetching Owned PS5 Games Only ===")
 
-        guard let oauthToken = fetchOwnedGamesOAuthToken(npssoToken: npssoToken) else { return [] }
-        let entitlements = fetchEntitlements(oauthToken: oauthToken)
-        let publicCatalog = fetchPs5CloudCatalog(locale: locale)
-
-        let entitlementSet = Set(entitlements)
-        let owned = publicCatalog.compactMap { game -> CloudGame? in
-            guard entitlementSet.contains(game.id) else { return nil }
-            var ownedGame = game
-            ownedGame.isOwned = true
-            return ownedGame
-        }
+        let publicCatalog = fetchPs5CloudCatalog(locale: locale, forceRefresh: forceRefresh)
+        let owned = getOwnedPs5CloudGames(npssoToken: npssoToken, publicCatalog: publicCatalog)
 
         os_log(.info, log: catalogLog, "Owned streaming games: %d", owned.count)
         if !owned.isEmpty { cacheGames(owned, filename: Self.pscloudOwnedCacheFile) }
         return owned
+    }
+
+    /// Mirrors CloudCatalogBackend::getOwnedPs5CloudGames orchestration (network path).
+    private func getOwnedPs5CloudGames(npssoToken: String, publicCatalog: [CloudGame]) -> [CloudGame] {
+        guard !npssoToken.isEmpty,
+              let oauthToken = fetchOwnedGamesOAuthToken(npssoToken: npssoToken) else {
+            return []
+        }
+
+        Thread.sleep(forTimeInterval: PsCloudOwnership.pageCooldownSeconds)
+        let rawObjects = fetchEntitlementsPaginated(oauthToken: oauthToken)
+        let rawEntitlements = rawObjects.compactMap { PsCloudOwnership.parseEntitlement($0) }
+        let filtered = PsCloudOwnership.filterOwnedPs5Games(rawEntitlements)
+
+        return PsCloudOwnership.crossReferenceOwnedGames(
+            filteredEntitlements: filtered,
+            publicCatalog: publicCatalog
+        )
     }
 
     private func fetchOwnedGamesOAuthToken(npssoToken: String) -> String? {
@@ -257,18 +227,31 @@ final class CloudCatalogService {
         return rest.split(separator: "&").first.map(String.init)
     }
 
-    private func fetchEntitlements(oauthToken: String) -> [String] {
-        let url = "https://commerce.api.np.km.playstation.net/commerce/api/v1/users/me/internal_entitlements?fields=game_meta&entitlement_type=5&start=0&size=10000"
+    private func fetchEntitlementsPaginated(oauthToken: String) -> [[String: Any]] {
+        var all: [[String: Any]] = []
+        var start = 0
 
-        guard let response = CloudHttpClient.get(url: url, headers: [
-            "Authorization": "Bearer \(oauthToken)",
-            "Accept": "application/json"
-        ]), response.statusCode == 200,
-              let data = response.body.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let ents = json["entitlements"] as? [[String: Any]] else { return [] }
+        while true {
+            let url = "https://commerce.api.np.km.playstation.net/commerce/api/v1/users/me/internal_entitlements?fields=game_meta&entitlement_type=5&start=\(start)&size=\(PsCloudOwnership.pageSize)"
 
-        return ents.compactMap { $0["id"] as? String }.filter { !$0.isEmpty }
+            guard let response = CloudHttpClient.get(url: url, headers: [
+                "Authorization": "Bearer \(oauthToken)",
+                "Accept": "application/json"
+            ]), response.statusCode == 200,
+                  let data = response.body.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let page = json["entitlements"] as? [[String: Any]] else {
+                os_log(.error, log: catalogLog, "Entitlements page failed at start=%d", start)
+                break
+            }
+
+            all.append(contentsOf: page)
+            if page.count < PsCloudOwnership.pageSize { break }
+            start += page.count
+            Thread.sleep(forTimeInterval: PsCloudOwnership.pageCooldownSeconds)
+        }
+
+        return all
     }
 
     // MARK: - PSNow Catalog

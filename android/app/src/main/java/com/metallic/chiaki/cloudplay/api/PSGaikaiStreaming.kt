@@ -1189,13 +1189,17 @@ catch (e: Exception)
 		body.put("dataCenter", selectedDatacenter)
 		
 		// Network info from ping results
+		val cloudBwKbps = if (serviceType == "pscloud")
+			preferences.getCloudBitratePscloud()
+		else
+			preferences.getCloudBitratePsnow()
 		val network = JSONObject()
-		network.put("bwKbpsSent", 50000)  // 50 Mbps upload
+		network.put("bwKbpsSent", cloudBwKbps)
 		network.put("bwLoss", 0.001)  // 0.1% packet loss
 		network.put("mtu", selectedDatacenterPingResult.optInt("mtu_in", 1454))
 		network.put("rtt", selectedDatacenterPingResult.optInt("rtt", 25))
 		network.put("port", selectedDatacenterPort)
-		network.put("bwKbpsReceived", 200000)  // 200 Mbps download
+		network.put("bwKbpsReceived", cloudBwKbps)
 		network.put("bwLossUpstream", 0)
 		network.put("mtuUpstream", selectedDatacenterPingResult.optInt("mtu_out", 1254))
 		body.put("network", network)

@@ -74,17 +74,23 @@ struct StreamPreferences: Codable {
     // Cloud Game Library (PSCloud)
     var cloudResolutionPscloud: String = "720"      // matches Android default
     var cloudDatacenterPscloud: String = "Auto"     // matches Android default
+    var cloudBitratePscloud: Int = 20000            // kbps, matches Qt/Android default 20 Mbps
 
     // Cloud Game Catalog (PSNow)
     var cloudResolutionPsnow: String = "720"        // matches Android default
     var cloudDatacenterPsnow: String = "Auto"       // matches Android default
+    var cloudBitratePsnow: Int = 20000              // kbps, matches Qt/Android default 20 Mbps
+
+    static let cloudBitrateMinKbps = 2000
+    static let cloudBitrateMaxKbps = 200_000
+    static let cloudBitrateDefaultKbps = 20000
 
     private enum CodingKeys: String, CodingKey {
         case resolutionIndex, fps, bitrate, codec
         case swapCrossMoon, rumbleEnabled, motionEnabled, touchHapticsEnabled, logVerbose
         case onScreenControlsEnabled, touchpadOnlyEnabled
-        case cloudResolutionPscloud, cloudDatacenterPscloud
-        case cloudResolutionPsnow, cloudDatacenterPsnow
+        case cloudResolutionPscloud, cloudDatacenterPscloud, cloudBitratePscloud
+        case cloudResolutionPsnow, cloudDatacenterPsnow, cloudBitratePsnow
     }
 
     init(
@@ -101,8 +107,10 @@ struct StreamPreferences: Codable {
         touchpadOnlyEnabled: Bool = false,
         cloudResolutionPscloud: String = "720",
         cloudDatacenterPscloud: String = "Auto",
+        cloudBitratePscloud: Int = StreamPreferences.cloudBitrateDefaultKbps,
         cloudResolutionPsnow: String = "720",
-        cloudDatacenterPsnow: String = "Auto"
+        cloudDatacenterPsnow: String = "Auto",
+        cloudBitratePsnow: Int = StreamPreferences.cloudBitrateDefaultKbps
     ) {
         self.resolutionIndex = resolutionIndex
         self.fps = fps
@@ -117,8 +125,10 @@ struct StreamPreferences: Codable {
         self.touchpadOnlyEnabled = touchpadOnlyEnabled
         self.cloudResolutionPscloud = cloudResolutionPscloud
         self.cloudDatacenterPscloud = cloudDatacenterPscloud
+        self.cloudBitratePscloud = Self.clampCloudBitrateKbps(cloudBitratePscloud)
         self.cloudResolutionPsnow = cloudResolutionPsnow
         self.cloudDatacenterPsnow = cloudDatacenterPsnow
+        self.cloudBitratePsnow = Self.clampCloudBitrateKbps(cloudBitratePsnow)
     }
 
     init(from decoder: Decoder) throws {
@@ -136,8 +146,14 @@ struct StreamPreferences: Codable {
         touchpadOnlyEnabled = try c.decodeIfPresent(Bool.self, forKey: .touchpadOnlyEnabled) ?? false
         cloudResolutionPscloud = try c.decodeIfPresent(String.self, forKey: .cloudResolutionPscloud) ?? "720"
         cloudDatacenterPscloud = try c.decodeIfPresent(String.self, forKey: .cloudDatacenterPscloud) ?? "Auto"
+        cloudBitratePscloud = Self.clampCloudBitrateKbps(
+            try c.decodeIfPresent(Int.self, forKey: .cloudBitratePscloud) ?? Self.cloudBitrateDefaultKbps
+        )
         cloudResolutionPsnow = try c.decodeIfPresent(String.self, forKey: .cloudResolutionPsnow) ?? "720"
         cloudDatacenterPsnow = try c.decodeIfPresent(String.self, forKey: .cloudDatacenterPsnow) ?? "Auto"
+        cloudBitratePsnow = Self.clampCloudBitrateKbps(
+            try c.decodeIfPresent(Int.self, forKey: .cloudBitratePsnow) ?? Self.cloudBitrateDefaultKbps
+        )
     }
 
     func encode(to encoder: Encoder) throws {
@@ -155,8 +171,19 @@ struct StreamPreferences: Codable {
         try c.encode(touchpadOnlyEnabled, forKey: .touchpadOnlyEnabled)
         try c.encode(cloudResolutionPscloud, forKey: .cloudResolutionPscloud)
         try c.encode(cloudDatacenterPscloud, forKey: .cloudDatacenterPscloud)
+        try c.encode(cloudBitratePscloud, forKey: .cloudBitratePscloud)
         try c.encode(cloudResolutionPsnow, forKey: .cloudResolutionPsnow)
         try c.encode(cloudDatacenterPsnow, forKey: .cloudDatacenterPsnow)
+        try c.encode(cloudBitratePsnow, forKey: .cloudBitratePsnow)
+    }
+
+    static func clampCloudBitrateKbps(_ kbps: Int) -> Int {
+        min(cloudBitrateMaxKbps, max(cloudBitrateMinKbps, kbps))
+    }
+
+    func cloudBitrateKbps(for serviceType: String) -> Int {
+        let raw = serviceType == "pscloud" ? cloudBitratePscloud : cloudBitratePsnow
+        return Self.clampCloudBitrateKbps(raw)
     }
 
     var resolution: StreamResolution {
@@ -487,6 +514,11 @@ struct SettingsView: View {
                 selection: $prefs.cloudDatacenterPscloud,
                 serviceType: "pscloud"
             )
+
+            cloudBitrateSlider(
+                bitrateKbps: $prefs.cloudBitratePscloud,
+                label: "Bitrate"
+            )
         } header: {
             Text("Game Library")
         }
@@ -509,8 +541,32 @@ struct SettingsView: View {
                 selection: $prefs.cloudDatacenterPsnow,
                 serviceType: "psnow"
             )
+
+            cloudBitrateSlider(
+                bitrateKbps: $prefs.cloudBitratePsnow,
+                label: "Bitrate"
+            )
         } header: {
             Text("Game Catalog")
+        }
+    }
+
+    private func cloudBitrateSlider(bitrateKbps: Binding<Int>, label: String) -> some View {
+        let mbpsBinding = Binding<Double>(
+            get: { Double(bitrateKbps.wrappedValue) / 1000.0 },
+            set: { newValue in
+                bitrateKbps.wrappedValue = StreamPreferences.clampCloudBitrateKbps(Int(newValue * 1000))
+                prefs.save()
+            }
+        )
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(label)
+                Spacer()
+                Text("\(Int(mbpsBinding.wrappedValue.rounded())) Mbps")
+                    .foregroundStyle(.secondary)
+            }
+            Slider(value: mbpsBinding, in: 2...200, step: 1)
         }
     }
 

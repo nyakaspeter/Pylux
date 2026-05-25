@@ -340,18 +340,9 @@ void CloudStreamingBackend::startGaikaiAllocation(QString serviceType, QString p
             qWarning() << "Cloud mode: No ping results available, will use default MTU values";
         }
         
-        // Set codec based on service type:
-        // - PSCLOUD: H.265/HEVC
-        // - PSNOW: H.264
-        // This must match what the server sends and what the decoder is initialized with.
-        if (connect_info.service_type == CHIAKI_SERVICE_TYPE_PSCLOUD) {
-            connect_info.video_profile.codec = CHIAKI_CODEC_H265;
-            qInfo() << "Cloud Play (PSCLOUD): Setting codec to H.265/HEVC for decoder initialization";
-        } else {
-            connect_info.video_profile.codec = CHIAKI_CODEC_H264;
-            qInfo() << "Cloud Play (PSNOW): Setting codec to H.264 for decoder initialization";
-        }
-        
+        // Override Remote Play default video profile with cloud resolution/codec/bitrate.
+        connect_info.video_profile = settings->GetCloudVideoProfile(serviceType);
+
         qInfo() << "Cloud streaming parameters set:";
         qInfo() << "  service_type:" << chiaki_service_type_string(connect_info.service_type);
         qInfo() << "  cloud_session_id set:" << !connect_info.cloud_session_id.isEmpty();

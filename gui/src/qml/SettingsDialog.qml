@@ -2852,13 +2852,13 @@ DialogView {
                         visible: selectedCloudService == SettingsDialog.CloudService.PSCloud
                         KeyNavigation.left: resolutionPSCloud
                         KeyNavigation.up: resolutionPSCloud
+                        KeyNavigation.down: cloudBitratePSCloud
                         KeyNavigation.priority: {
                             if(!popup.visible)
                                 KeyNavigation.BeforeItem
                             else
                                 KeyNavigation.AfterItem
                         }
-                        lastInFocusChain: selectedCloudService == SettingsDialog.CloudService.PSCloud
                     }
 
                     Label {
@@ -2918,19 +2918,110 @@ DialogView {
                         visible: selectedCloudService == SettingsDialog.CloudService.PSNOW
                         KeyNavigation.left: resolutionPSNOW
                         KeyNavigation.up: resolutionPSNOW
+                        KeyNavigation.down: cloudBitratePSNOW
                         KeyNavigation.priority: {
                             if(!popup.visible)
                                 KeyNavigation.BeforeItem
                             else
                                 KeyNavigation.AfterItem
                         }
-                        lastInFocusChain: selectedCloudService == SettingsDialog.CloudService.PSNOW
                     }
 
                     Label {
                         Layout.alignment: Qt.AlignRight
                         text: qsTr("(Auto)")
                         visible: selectedCloudService == SettingsDialog.CloudService.PSNOW
+                    }
+
+                    Label {
+                        Layout.alignment: Qt.AlignRight
+                        text: qsTr("Bitrate:")
+                    }
+
+                    Item {
+                        visible: selectedCloudService == SettingsDialog.CloudService.PSCloud
+                        Layout.preferredWidth: 400
+                        Layout.preferredHeight: cloudBitratePSCloud.implicitHeight
+
+                        Label {
+                            id: cloudBitratePSCloudValue
+                            anchors {
+                                right: parent.right
+                                verticalCenter: parent.verticalCenter
+                            }
+                            width: 70
+                            horizontalAlignment: Text.AlignRight
+                            text: Math.round(cloudBitratePSCloud.value) + qsTr(" Mbps")
+                        }
+
+                        C.Slider {
+                            id: cloudBitratePSCloud
+                            clip: true
+                            anchors {
+                                left: parent.left
+                                right: cloudBitratePSCloudValue.left
+                                rightMargin: 20
+                                verticalCenter: parent.verticalCenter
+                            }
+                            from: 2
+                            to: 200
+                            stepSize: 1
+                            value: Chiaki.settings.cloudBitratePSCloud / 1000
+                            onMoved: Chiaki.settings.cloudBitratePSCloud = value * 1000
+                            KeyNavigation.up: datacenterPSCloud
+                            KeyNavigation.down: cloudBitratePSCloud
+                            KeyNavigation.priority: KeyNavigation.BeforeItem
+                            lastInFocusChain: selectedCloudService == SettingsDialog.CloudService.PSCloud
+                        }
+                    }
+
+                    Label {
+                        Layout.alignment: Qt.AlignRight
+                        visible: selectedCloudService == SettingsDialog.CloudService.PSCloud
+                        text: qsTr("(20 Mbps)")
+                    }
+
+                    Item {
+                        visible: selectedCloudService == SettingsDialog.CloudService.PSNOW
+                        Layout.preferredWidth: 400
+                        Layout.preferredHeight: cloudBitratePSNOW.implicitHeight
+
+                        Label {
+                            id: cloudBitratePSNOWValue
+                            anchors {
+                                right: parent.right
+                                verticalCenter: parent.verticalCenter
+                            }
+                            width: 70
+                            horizontalAlignment: Text.AlignRight
+                            text: Math.round(cloudBitratePSNOW.value) + qsTr(" Mbps")
+                        }
+
+                        C.Slider {
+                            id: cloudBitratePSNOW
+                            clip: true
+                            anchors {
+                                left: parent.left
+                                right: cloudBitratePSNOWValue.left
+                                rightMargin: 20
+                                verticalCenter: parent.verticalCenter
+                            }
+                            from: 2
+                            to: 200
+                            stepSize: 1
+                            value: Chiaki.settings.cloudBitratePSNOW / 1000
+                            onMoved: Chiaki.settings.cloudBitratePSNOW = value * 1000
+                            KeyNavigation.up: datacenterPSNOW
+                            KeyNavigation.down: cloudBitratePSNOW
+                            KeyNavigation.priority: KeyNavigation.BeforeItem
+                            lastInFocusChain: selectedCloudService == SettingsDialog.CloudService.PSNOW
+                        }
+                    }
+
+                    Label {
+                        Layout.alignment: Qt.AlignRight
+                        visible: selectedCloudService == SettingsDialog.CloudService.PSNOW
+                        text: qsTr("(20 Mbps)")
                     }
                 }
                 }

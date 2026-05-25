@@ -62,6 +62,8 @@ class DataStore(val preferences: Preferences): PreferenceDataStore()
 		preferences.codecKey -> preferences.codec.value
 		preferences.cloudDatacenterPsnowKey -> preferences.getCloudDatacenterPsnow()
 		preferences.cloudDatacenterPscloudKey -> preferences.getCloudDatacenterPscloud()
+		preferences.cloudResolutionPscloudKey -> preferences.getCloudResolutionPscloud().toString()
+		preferences.cloudResolutionPsnowKey -> preferences.getCloudResolutionPsnow().toString()
 		else -> defValue
 	}
 
@@ -87,6 +89,24 @@ class DataStore(val preferences: Preferences): PreferenceDataStore()
 			}
 			preferences.cloudDatacenterPsnowKey -> preferences.setCloudDatacenterPsnow(value ?: "Auto")
 			preferences.cloudDatacenterPscloudKey -> preferences.setCloudDatacenterPscloud(value ?: "Auto")
+			preferences.cloudResolutionPscloudKey -> preferences.setCloudResolutionPscloud(value?.toIntOrNull() ?: 720)
+			preferences.cloudResolutionPsnowKey -> preferences.setCloudResolutionPsnow(value?.toIntOrNull() ?: 720)
+		}
+	}
+
+	override fun getInt(key: String, defValue: Int) = when(key)
+	{
+		preferences.cloudBitratePscloudKey -> preferences.getCloudBitratePscloud() / 1000
+		preferences.cloudBitratePsnowKey -> preferences.getCloudBitratePsnow() / 1000
+		else -> defValue
+	}
+
+	override fun putInt(key: String, value: Int)
+	{
+		when(key)
+		{
+			preferences.cloudBitratePscloudKey -> preferences.setCloudBitratePscloud(value * 1000)
+			preferences.cloudBitratePsnowKey -> preferences.setCloudBitratePsnow(value * 1000)
 		}
 	}
 }
@@ -172,6 +192,13 @@ class SettingsFragment: PreferenceFragmentCompat(), TitleFragment
 		populateCloudDatacenterPreference(
 			preferenceScreen.findPreference(getString(R.string.preferences_cloud_datacenter_pscloud_key)),
 			preferences.getCloudDatacentersJsonPscloud()
+		)
+
+		bindCloudBitratePreference(
+			preferenceScreen.findPreference(getString(R.string.preferences_cloud_bitrate_pscloud_key))
+		)
+		bindCloudBitratePreference(
+			preferenceScreen.findPreference(getString(R.string.preferences_cloud_bitrate_psnow_key))
 		)
 
 		val bitratePreference = preferenceScreen.findPreference<EditTextPreference>(getString(R.string.preferences_bitrate_key))
@@ -360,6 +387,19 @@ class SettingsFragment: PreferenceFragmentCompat(), TitleFragment
 	 * Populate cloud datacenter dropdown from saved ping results JSON
 	 * Matches Qt behavior of showing discovered datacenters with their ping times
 	 */
+	private fun bindCloudBitratePreference(preference: SeekBarPreference?)
+	{
+		if (preference == null) return
+		val summaryRes = when (preference.key)
+		{
+			preferences.cloudBitratePsnowKey -> R.string.preferences_cloud_bitrate_psnow_summary
+			else -> R.string.preferences_cloud_bitrate_pscloud_summary
+		}
+		preference.summaryProvider = Preference.SummaryProvider<SeekBarPreference> { pref ->
+			getString(summaryRes, pref.value)
+		}
+	}
+
 	private fun populateCloudDatacenterPreference(preference: ListPreference?, datacentersJson: String)
 	{
 		if (preference == null) return

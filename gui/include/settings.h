@@ -314,6 +314,10 @@ class Settings : public QObject
 		void SetCloudDatacenterPSCloud(const QString &datacenter);
 		QString GetCloudDatacentersJsonPSCloud() const;  // JSON array of datacenters with ping results
 		void SetCloudDatacentersJsonPSCloud(const QString &json);
+		unsigned int GetCloudBitratePSCloud() const;
+		void SetCloudBitratePSCloud(unsigned int bitrate_kbps);
+		unsigned int GetCloudBitratePSNOW() const;
+		void SetCloudBitratePSNOW(unsigned int bitrate_kbps);
 
 		// PSNOW settings
 		int GetCloudResolutionPSNOW() const;
@@ -324,6 +328,8 @@ class Settings : public QObject
 		void SetCloudDatacenterPSNOW(const QString &datacenter);
 		QString GetCloudDatacentersJsonPSNOW() const;  // JSON array of datacenters with ping results
 		void SetCloudDatacentersJsonPSNOW(const QString &json);
+
+		ChiakiConnectVideoProfile GetCloudVideoProfile(const QString &serviceType) const;
 
 		/**
 		 * @return 0 if set to "automatic"

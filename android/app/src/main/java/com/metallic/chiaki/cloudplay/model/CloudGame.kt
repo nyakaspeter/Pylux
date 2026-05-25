@@ -14,7 +14,9 @@ data class CloudGame(
 	val platform: String = "ps4", // "ps4", "ps3", or "ps5"
 	val serviceType: String = "psnow", // "psnow" or "pscloud"
 	val conceptUrl: String = "", // URL to add game to library (PS5 games)
-	val isOwned: Boolean = false // Whether user owns this game (PS5 games)
+	val isOwned: Boolean = false, // Whether user owns this game (PS5 games)
+	val entitlementId: String = "", // PSCloud: entitlement id for streaming (Qt gameData.id)
+	val storeProductId: String = "" // PSCloud: product_id from entitlements API
 )
 
 /**

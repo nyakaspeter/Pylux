@@ -211,21 +211,27 @@ class PsCloudCatalogService
 		Log.i(TAG, "=== Fetching Owned PS5 Games ===")
 		Log.i(TAG, "  Locale: $locale")
 		
-		// Step 1: Get OAuth token for entitlements API (Qt lines 1008-1009)
-		val oauthToken = fetchOwnedGamesOAuthToken(npssoToken)
-		
-		// Step 2: Fetch entitlements (Qt lines 1099-1156)
-		val entitlements = fetchEntitlements(oauthToken)
-		
-		// Step 3: Fetch public PS5 catalog for cross-reference (Qt lines 1157-1288)
 		val publicCatalog = fetchPs5CloudCatalog(locale)
-		
-		// Step 4: Cross-reference owned games with catalog (Qt lines 1289-1384)
-		val ownedGames = crossReferenceOwnedGames(entitlements, publicCatalog)
+		val ownedGames = getOwnedPs5CloudGames(npssoToken, publicCatalog)
 		
 		Log.i(TAG, "  Owned streaming games: ${ownedGames.size}")
-		
 		return ownedGames
+	}
+
+	/**
+	 * Mirrors CloudCatalogBackend::getOwnedPs5CloudGames cross-reference (network).
+	 */
+	suspend fun getOwnedPs5CloudGames(npssoToken: String, publicCatalog: List<CloudGame>): List<CloudGame>
+	{
+		if (npssoToken.isEmpty()) return emptyList()
+		
+		val oauthToken = fetchOwnedGamesOAuthToken(npssoToken)
+		kotlinx.coroutines.delay(PsCloudOwnership.PAGE_COOLDOWN_MS)
+		
+		val rawEntitlements = fetchEntitlementsPaginated(oauthToken)
+		val filtered = PsCloudOwnership.filterOwnedPs5Games(rawEntitlements)
+		
+		return PsCloudOwnership.crossReferenceOwnedGames(filtered, publicCatalog)
 	}
 	
 	/**
@@ -295,77 +301,50 @@ class PsCloudCatalogService
 	}
 	
 	/**
-	 * Fetch entitlements using OAuth token
-	 * Mirrors: CloudCatalogBackend::fetchOwnedGamesPage() (Qt lines 1192-1216)
+	 * Fetch entitlements using OAuth token (paginated).
+	 * Mirrors: CloudCatalogBackend::fetchOwnedGamesPage()
 	 */
-	private suspend fun fetchEntitlements(oauthToken: String): List<String>
+	private suspend fun fetchEntitlementsPaginated(oauthToken: String): List<PsCloudOwnership.Entitlement>
 	{
-		Log.i(TAG, "=== Fetching entitlements ===")
+		Log.i(TAG, "=== Fetching entitlements (paginated) ===")
 		
-		// Use the correct commerce API endpoint (Qt line 1194)
-		val url = "https://commerce.api.np.km.playstation.net/commerce/api/v1/users/me/internal_entitlements?fields=game_meta&entitlement_type=5&start=0&size=10000"
+		val all = mutableListOf<PsCloudOwnership.Entitlement>()
+		var start = 0
 		
-		Log.d(TAG, "Entitlements URL: $url")
-		
-		val response = HttpClient.get(
-			url = url,
-			headers = mapOf(
-				"Authorization" to "Bearer $oauthToken",
-				"Accept" to "application/json"
-			)
-		)
-		
-		if (response.statusCode != 200)
+		while (true)
 		{
-			Log.e(TAG, "Entitlements fetch failed: ${response.statusCode}")
-			Log.e(TAG, "Response body: ${response.body}")
-			throw Exception("Failed to fetch entitlements: HTTP ${response.statusCode}")
-		}
-		
-		val jsonObj = JSONObject(response.body)
-		val entitlementsArray = jsonObj.optJSONArray("entitlements") ?: JSONArray()
-		
-		val productIds = mutableListOf<String>()
-		
-		for (i in 0 until entitlementsArray.length())
-		{
-			val entitlement = entitlementsArray.getJSONObject(i)
-			val productId = entitlement.optString("id", "")
+			val url = "https://commerce.api.np.km.playstation.net/commerce/api/v1/users/me/internal_entitlements?fields=game_meta&entitlement_type=5&start=$start&size=${PsCloudOwnership.PAGE_SIZE}"
 			
-			if (productId.isNotEmpty())
+			val response = HttpClient.get(
+				url = url,
+				headers = mapOf(
+					"Authorization" to "Bearer $oauthToken",
+					"Accept" to "application/json"
+				)
+			)
+			
+			if (response.statusCode != 200)
 			{
-				productIds.add(productId)
+				Log.e(TAG, "Entitlements fetch failed: ${response.statusCode}")
+				throw Exception("Failed to fetch entitlements: HTTP ${response.statusCode}")
 			}
+			
+			val jsonObj = JSONObject(response.body)
+			val entitlementsArray = jsonObj.optJSONArray("entitlements") ?: JSONArray()
+			val pageSize = entitlementsArray.length()
+			
+			for (i in 0 until pageSize)
+			{
+				PsCloudOwnership.parseEntitlement(entitlementsArray.getJSONObject(i))?.let { all.add(it) }
+			}
+			
+			if (pageSize < PsCloudOwnership.PAGE_SIZE) break
+			start += pageSize
+			kotlinx.coroutines.delay(PsCloudOwnership.PAGE_COOLDOWN_MS)
 		}
 		
-		Log.i(TAG, "  Entitlements count: ${productIds.size}")
-		
-		return productIds
-	}
-	
-	/**
-	 * Cross-reference owned entitlements with public catalog
-	 * Mirrors: CloudCatalogBackend::processCrossReferenceComplete() (Qt lines 1289-1384)
-	 */
-	private fun crossReferenceOwnedGames(entitlements: List<String>, publicCatalog: List<CloudGame>): List<CloudGame>
-	{
-		Log.i(TAG, "=== Cross-referencing owned games with catalog ===")
-		
-		val ownedGames = mutableListOf<CloudGame>()
-		
-		for (game in publicCatalog)
-		{
-			// Check if user owns this game (Qt lines 1312-1320)
-			if (entitlements.contains(game.productId))
-			{
-				// Mark as owned
-				ownedGames.add(game.copy(isOwned = true))
-			}
-		}
-		
-		Log.i(TAG, "  Matched ${ownedGames.size} owned games out of ${publicCatalog.size} catalog games")
-		
-		return ownedGames
+		Log.i(TAG, "  Entitlements count: ${all.size}")
+		return all
 	}
 	
 	/**

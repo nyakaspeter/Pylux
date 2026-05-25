@@ -471,6 +471,37 @@ void Settings::SetCloudDatacentersJsonPSCloud(const QString &json)
 	emit CloudDatacentersJsonPSCloudChanged();
 }
 
+static unsigned int ClampCloudBitrateKbps(unsigned int bitrate_kbps)
+{
+	if(bitrate_kbps < 2000)
+		return 2000;
+	if(bitrate_kbps > 200000)
+		return 200000;
+	return bitrate_kbps;
+}
+
+unsigned int Settings::GetCloudBitratePSCloud() const
+{
+	const unsigned int legacy = settings.value("settings/cloud_bitrate", 20000).toUInt();
+	return ClampCloudBitrateKbps(settings.value("settings/cloud_bitrate_pscloud", legacy).toUInt());
+}
+
+void Settings::SetCloudBitratePSCloud(unsigned int bitrate_kbps)
+{
+	settings.setValue("settings/cloud_bitrate_pscloud", ClampCloudBitrateKbps(bitrate_kbps));
+}
+
+unsigned int Settings::GetCloudBitratePSNOW() const
+{
+	const unsigned int legacy = settings.value("settings/cloud_bitrate", 20000).toUInt();
+	return ClampCloudBitrateKbps(settings.value("settings/cloud_bitrate_psnow", legacy).toUInt());
+}
+
+void Settings::SetCloudBitratePSNOW(unsigned int bitrate_kbps)
+{
+	settings.setValue("settings/cloud_bitrate_psnow", ClampCloudBitrateKbps(bitrate_kbps));
+}
+
 // PSNOW settings
 int Settings::GetCloudResolutionPSNOW() const
 {
@@ -481,6 +512,39 @@ int Settings::GetCloudResolutionPSNOW() const
 void Settings::SetCloudResolutionPSNOW(int resolution)
 {
 	settings.setValue("settings/cloud_resolution_psnow", resolution);
+}
+
+ChiakiConnectVideoProfile Settings::GetCloudVideoProfile(const QString &serviceType) const
+{
+	const bool pscloud = serviceType.compare("pscloud", Qt::CaseInsensitive) == 0;
+	const int resolution = pscloud ? GetCloudResolutionPSCloud() : GetCloudResolutionPSNOW();
+	const unsigned int cloud_bitrate = pscloud ? GetCloudBitratePSCloud() : GetCloudBitratePSNOW();
+
+	ChiakiConnectVideoProfile profile = {};
+	switch(resolution)
+	{
+	case 720:
+		profile.width = 1280;
+		profile.height = 720;
+		break;
+	case 1440:
+		profile.width = 2560;
+		profile.height = 1440;
+		break;
+	case 2160:
+		profile.width = 3840;
+		profile.height = 2160;
+		break;
+	default:
+		profile.width = 1920;
+		profile.height = 1080;
+		break;
+	}
+	profile.bitrate = cloud_bitrate;
+	profile.max_fps = 60;
+	profile.codec = pscloud ? CHIAKI_CODEC_H265 : CHIAKI_CODEC_H264;
+
+	return profile;
 }
 
 QString Settings::GetCloudLanguagePSNOW() const
