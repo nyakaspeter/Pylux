@@ -222,6 +222,17 @@ QString QmlSettings::cloudDatacentersJsonPSCloud() const
     return settings->GetCloudDatacentersJsonPSCloud();
 }
 
+int QmlSettings::cloudBitratePSCloud() const
+{
+    return static_cast<int>(settings->GetCloudBitratePSCloud());
+}
+
+void QmlSettings::setCloudBitratePSCloud(int bitrate)
+{
+    settings->SetCloudBitratePSCloud(static_cast<unsigned int>(bitrate));
+    emit cloudBitratePSCloudChanged();
+}
+
 // PSNOW settings
 int QmlSettings::cloudResolutionPSNOW() const
 {
@@ -259,6 +270,17 @@ void QmlSettings::setCloudDatacenterPSNOW(const QString &datacenter)
 QString QmlSettings::cloudDatacentersJsonPSNOW() const
 {
     return settings->GetCloudDatacentersJsonPSNOW();
+}
+
+int QmlSettings::cloudBitratePSNOW() const
+{
+    return static_cast<int>(settings->GetCloudBitratePSNOW());
+}
+
+void QmlSettings::setCloudBitratePSNOW(int bitrate)
+{
+    settings->SetCloudBitratePSNOW(static_cast<unsigned int>(bitrate));
+    emit cloudBitratePSNOWChanged();
 }
 
 int QmlSettings::disconnectAction() const

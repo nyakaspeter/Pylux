@@ -170,7 +170,7 @@ final class CloudPlayViewModel: ObservableObject {
 
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self = self else { return }
-            let gameIdentifier = game.id
+            let gameIdentifier = game.streamingIdentifier
             let gameName = game.name
             let serviceType = game.serviceType
             var cancelled = false
@@ -964,6 +964,7 @@ struct CloudStreamWrapperView: View {
         let cloudRes = cloudSession.serviceType == "pscloud"
             ? prefs.cloudResolutionDimensionsPscloud
             : prefs.cloudResolutionDimensionsPsnow
+        let cloudBitrate = prefs.cloudBitrateKbps(for: cloudSession.serviceType)
 
         return StreamConnectInfo(
             host: cloudSession.serverIp,
@@ -973,7 +974,7 @@ struct CloudStreamWrapperView: View {
             videoWidth: UInt32(cloudRes.width),
             videoHeight: UInt32(cloudRes.height),
             videoMaxFps: 60,
-            videoBitrate: UInt32(prefs.effectiveBitrate),
+            videoBitrate: UInt32(cloudBitrate),
             videoCodec: cloudSession.serviceType == "pscloud" ? 1 : 0,
             serviceType: cloudSession.serviceType == "pscloud" ? 2 : 1,
             cloudLaunchSpec: cloudSession.launchSpec,

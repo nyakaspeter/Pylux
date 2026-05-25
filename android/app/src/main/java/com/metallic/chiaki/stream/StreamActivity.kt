@@ -351,6 +351,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 	}
 
 	private val hideSystemUIRunnable = Runnable { hideSystemUI() }
+	private val hideOverlayRunnable = Runnable { hideOverlay() }
 
 	override fun onSystemUiVisibilityChange(visibility: Int)
 	{
@@ -374,7 +375,9 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 				}
 			})
 		uiVisibilityHandler.removeCallbacks(hideSystemUIRunnable)
+		uiVisibilityHandler.removeCallbacks(hideOverlayRunnable)
 		uiVisibilityHandler.postDelayed(hideSystemUIRunnable, HIDE_UI_TIMEOUT_MS)
+		uiVisibilityHandler.postDelayed(hideOverlayRunnable, HIDE_UI_TIMEOUT_MS)
 	}
 
 	private fun hideOverlay()

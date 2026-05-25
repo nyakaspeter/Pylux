@@ -184,6 +184,7 @@ DialogView {
 
             // Left side - QR Code
             Item {
+                id: leftPanel
                 Layout.fillHeight: true
                 Layout.fillWidth: true
                 Layout.preferredWidth: parent.width / 2
@@ -191,12 +192,7 @@ DialogView {
                 ColumnLayout {
                     anchors.fill: parent
                     anchors.margins: 20
-                    spacing: 25
-
-                    // Top spacer to center content vertically
-                    Item {
-                        Layout.fillHeight: true
-                    }
+                    spacing: 12
 
                     Text {
                         Layout.alignment: Qt.AlignHCenter
@@ -204,39 +200,49 @@ DialogView {
                         font.pointSize: 18
                         font.weight: Font.Bold
                         color: Material.foreground
-                        Layout.bottomMargin: 10
                     }
 
-                    // QR Code container
-                    Rectangle {
-                        Layout.alignment: Qt.AlignHCenter
-                        Layout.preferredWidth: 350
-                        Layout.preferredHeight: 350
-                        color: "white"
-                        border.color: Material.accent
-                        border.width: 2
-                        radius: 12
+                    // Fills remaining height; QR scales to fit so buttons stay on screen
+                    Item {
+                        id: qrContainer
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        Layout.minimumHeight: 100
 
-                        Image {
-                            id: qrCodeImage
+                        readonly property real side: Math.min(width, height, 350)
+
+                        Rectangle {
                             anchors.centerIn: parent
-                            width: 320
-                            height: 320
-                            source: "https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=" + encodeURIComponent(Chiaki.getPyluxURL() + "/psstream/?psstream_code=" + dialog.qrCode)
-                            fillMode: Image.PreserveAspectFit
-                            cache: false
+                            width: qrContainer.side
+                            height: qrContainer.side
+                            color: "white"
+                            border.color: Material.accent
+                            border.width: 2
+                            radius: 12
 
-                            BusyIndicator {
-                                anchors.centerIn: parent
-                                running: qrCodeImage.status === Image.Loading
-                                visible: running
-                            }
+                            Image {
+                                id: qrCodeImage
+                                anchors.fill: parent
+                                anchors.margins: 10
+                                readonly property int qrSize: 350
+                                source: "https://api.qrserver.com/v1/create-qr-code/?size=" + qrSize + "x" + qrSize + "&data=" + encodeURIComponent(Chiaki.getPyluxURL() + "/psstream/?psstream_code=" + dialog.qrCode)
+                                fillMode: Image.PreserveAspectFit
+                                sourceSize.width: qrSize
+                                sourceSize.height: qrSize
+                                cache: true
 
-                            Label {
-                                anchors.centerIn: parent
-                                text: qsTr("QR Code Error")
-                                visible: qrCodeImage.status === Image.Error
-                                color: Material.color(Material.Red)
+                                BusyIndicator {
+                                    anchors.centerIn: parent
+                                    running: qrCodeImage.status === Image.Loading
+                                    visible: running
+                                }
+
+                                Label {
+                                    anchors.centerIn: parent
+                                    text: qsTr("QR Code Error")
+                                    visible: qrCodeImage.status === Image.Error
+                                    color: Material.color(Material.Red)
+                                }
                             }
                         }
                     }
@@ -244,7 +250,6 @@ DialogView {
                     // Code display - more subtle
                     Rectangle {
                         Layout.alignment: Qt.AlignHCenter
-                        Layout.topMargin: 15
                         Layout.preferredWidth: 200
                         height: codeLabel.implicitHeight + 12
                         color: Material.color(Material.Grey, Material.Shade900)
@@ -267,7 +272,6 @@ DialogView {
                     // Action buttons row
                     RowLayout {
                         Layout.alignment: Qt.AlignHCenter
-                        Layout.topMargin: 20
                         spacing: 20
 
                         C.Button {
@@ -331,11 +335,6 @@ DialogView {
                                 }
                             }
                         }
-                    }
-
-                    // Bottom spacer to center content vertically
-                    Item {
-                        Layout.fillHeight: true
                     }
                 }
             }

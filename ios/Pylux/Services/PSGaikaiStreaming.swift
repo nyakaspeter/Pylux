@@ -662,12 +662,16 @@ final class PSGaikaiStreaming {
 
     private func step13_AllocateSlot() throws -> [String: Any] {
         let url = "\(CloudApiConstants.gaikaiBase)/sessions/\(gaikaiSessionId)/allocate"
+        let cloudPrefs = StreamPreferences.load()
+        let cloudBwKbps = serviceType == "pscloud"
+            ? StreamPreferences.clampCloudBitrateKbps(cloudPrefs.cloudBitratePscloud)
+            : StreamPreferences.clampCloudBitrateKbps(cloudPrefs.cloudBitratePsnow)
         let network: [String: Any] = [
-            "bwKbpsSent": 50000, "bwLoss": 0.001,
+            "bwKbpsSent": cloudBwKbps, "bwLoss": 0.001,
             "mtu": Self.jsonNumberToInt(selectedDatacenterPingResult["mtu_in"]) ?? 1454,
             "rtt": Self.jsonNumberToInt(selectedDatacenterPingResult["rtt"]) ?? 25,
             "port": selectedDatacenterPort,
-            "bwKbpsReceived": 200000, "bwLossUpstream": 0,
+            "bwKbpsReceived": cloudBwKbps, "bwLossUpstream": 0,
             "mtuUpstream": Self.jsonNumberToInt(selectedDatacenterPingResult["mtu_out"]) ?? 1254
         ]
 

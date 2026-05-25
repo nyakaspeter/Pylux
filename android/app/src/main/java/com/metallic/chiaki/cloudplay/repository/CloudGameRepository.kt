@@ -4,6 +4,7 @@ package com.metallic.chiaki.cloudplay.repository
 
 import android.content.Context
 import android.util.Log
+import com.metallic.chiaki.cloudplay.api.PsCloudOwnership
 import com.metallic.chiaki.cloudplay.api.PsnCatalogService
 import com.metallic.chiaki.cloudplay.api.PsCloudCatalogService
 import com.metallic.chiaki.cloudplay.model.CloudGame
@@ -122,29 +123,17 @@ class CloudGameRepository(
 	{
 		if (npssoToken.isEmpty())
 		{
-			// No token, can't check ownership - return games as-is (all marked as not owned)
 			return publicCatalog.map { it.copy(isOwned = false) }
 		}
 		
 		try
 		{
-			// Get locale for owned games fetch
-			val localeSetting = preferences.getCloudLanguage()
-			val locale = localeSetting.lowercase()
-			
-			// Fetch owned games
-			val ownedGames = pscloudCatalogService.fetchOwnedPs5Games(npssoToken, locale)
-			val ownedProductIds = ownedGames.map { it.productId }.toSet()
-			
-			// Mark ownership status
-			return publicCatalog.map { game ->
-				game.copy(isOwned = ownedProductIds.contains(game.productId))
-			}
+			val ownedCrossRef = pscloudCatalogService.getOwnedPs5CloudGames(npssoToken, publicCatalog)
+			return PsCloudOwnership.markAllTabOwnership(publicCatalog, ownedCrossRef)
 		}
 		catch (e: Exception)
 		{
 			Log.w(TAG, "Failed to cross-reference ownership, returning games as not owned", e)
-			// Return games as not owned if we can't check
 			return publicCatalog.map { it.copy(isOwned = false) }
 		}
 	}
@@ -234,8 +223,10 @@ class CloudGameRepository(
 					thumbnailUrl = obj.optString("thumbnailUrl", obj.getString("imageUrl")),
 					platform = obj.optString("platform", "ps4"),
 					serviceType = obj.optString("serviceType", "psnow"),
-					conceptUrl = obj.optString("conceptUrl", ""),  // Load from cache, empty if not present
-					isOwned = obj.optBoolean("isOwned", false)
+					conceptUrl = obj.optString("conceptUrl", ""),
+					isOwned = obj.optBoolean("isOwned", false),
+					entitlementId = obj.optString("entitlementId", ""),
+					storeProductId = obj.optString("storeProductId", "")
 				))
 			}
 			
@@ -270,6 +261,8 @@ class CloudGameRepository(
 				obj.put("serviceType", game.serviceType)
 				obj.put("conceptUrl", game.conceptUrl)
 				obj.put("isOwned", game.isOwned)
+				obj.put("entitlementId", game.entitlementId)
+				obj.put("storeProductId", game.storeProductId)
 				jsonArray.put(obj)
 			}
 			

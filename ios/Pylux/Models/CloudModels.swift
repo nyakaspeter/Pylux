@@ -7,7 +7,7 @@ import Foundation
 
 /// Represents a game in the cloud catalog (PSNow or PSCloud)
 struct CloudGame: Identifiable, Hashable {
-    let id: String           // productId
+    let id: String           // catalog productId (PSCloud) or product id (PSNOW)
     let name: String
     let imageUrl: String     // Cover/box art (type 10)
     let landscapeImageUrl: String  // Landscape (type 12/13)
@@ -15,10 +15,13 @@ struct CloudGame: Identifiable, Hashable {
     let serviceType: String  // "psnow" or "pscloud"
     let conceptUrl: String   // URL to add game to library (PS5)
     var isOwned: Bool        // Whether user owns this game (PS5)
+    var entitlementId: String   // PSCloud: entitlement id for streaming (Qt gameData.id)
+    var storeProductId: String  // PSCloud: product_id from entitlements API
 
     init(productId: String, name: String, imageUrl: String, landscapeImageUrl: String = "",
          platform: String = "ps4", serviceType: String = "psnow",
-         conceptUrl: String = "", isOwned: Bool = false) {
+         conceptUrl: String = "", isOwned: Bool = false,
+         entitlementId: String = "", storeProductId: String = "") {
         self.id = productId
         self.name = name
         self.imageUrl = imageUrl
@@ -27,6 +30,17 @@ struct CloudGame: Identifiable, Hashable {
         self.serviceType = serviceType
         self.conceptUrl = conceptUrl
         self.isOwned = isOwned
+        self.entitlementId = entitlementId
+        self.storeProductId = storeProductId
+    }
+
+    /// Mirrors CloudGameCard.qml getStreamingIdentifier() for PSCloud.
+    var streamingIdentifier: String {
+        if serviceType.lowercased() == "pscloud" {
+            if !entitlementId.isEmpty { return entitlementId }
+            if !storeProductId.isEmpty { return storeProductId }
+        }
+        return id
     }
 }
 
