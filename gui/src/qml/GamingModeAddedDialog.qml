@@ -52,7 +52,7 @@ Dialog {
                 font.pixelSize: 20
                 font.bold: true
                 color: Material.accent
-                text: qsTr("Added to Gaming Mode")
+                text: qsTr("Added to Steam")
             }
         }
 
@@ -64,7 +64,7 @@ Dialog {
             Label {
                 Layout.fillWidth: true
                 wrapMode: Text.Wrap
-                text: qsTr("Pylux has been added to Steam with artwork and the recommended Steam Deck controller layout.\n\nSwitch to Gaming Mode from the desktop to play. If Pylux does not appear in your library, restart Steam first.")
+                text: qsTr("Pylux has been added to your Steam library with artwork and a Steam Deck controller layout.\n\nOn Steam Deck, switch to Gaming Mode to play. If Pylux does not appear in your library, restart Steam first.")
             }
 
             RowLayout {

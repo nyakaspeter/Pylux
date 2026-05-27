@@ -183,6 +183,9 @@ if(CHIAKI_IS_MAC_APPSTORE)
 	target_sources(chiaki PRIVATE
 		include/macstorekit.h
 		src/macstorekit.mm
+		include/appreviewmanager.h
+		src/appreviewmanager.cpp
+		src/appreviewbridge.mm
 	)
 	target_link_libraries(chiaki "-framework StoreKit")
 endif()

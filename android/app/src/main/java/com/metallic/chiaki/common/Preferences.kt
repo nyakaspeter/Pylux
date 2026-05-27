@@ -7,10 +7,12 @@ import android.content.SharedPreferences
 import androidx.annotation.StringRes
 import androidx.preference.PreferenceManager
 import com.pylux.stream.R
+import com.metallic.chiaki.cloudplay.repository.CloudGameRepository
 import com.metallic.chiaki.lib.Codec
 import com.metallic.chiaki.lib.ConnectVideoProfile
 import com.metallic.chiaki.lib.VideoFPSPreset
 import com.metallic.chiaki.lib.VideoResolutionPreset
+import android.util.Log
 import io.reactivex.Observable
 import io.reactivex.subjects.BehaviorSubject
 import kotlin.math.max
@@ -48,8 +50,13 @@ class Preferences(context: Context)
 		val fpsAll = FPS.values()
 		val codecDefault = Codec.CODEC_H265
 		val codecAll = Codec.values()
+
+		const val CLOUD_BITRATE_MIN_KBPS = 2000
+		const val CLOUD_BITRATE_MAX_KBPS = 200000
+		const val CLOUD_BITRATE_DEFAULT_KBPS = 20000
 	}
 
+	private val appContext = context.applicationContext
 	private val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
 	private val sharedPreferenceChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
 		when(key)
@@ -231,8 +238,9 @@ class Preferences(context: Context)
 			.apply()
 	}
 
-	// Cloud language settings - UNIFIED for both PSNow and PSCloud (matching Qt GetCloudLanguagePSCloud)
-	// Qt uses ONE setting for both PSNow and PSCloud
+	fun isCloudLanguageConfigured(): Boolean =
+		sharedPreferences.contains("cloud_language_pscloud")
+
 	fun getCloudLanguage(): String
 	{
 		return sharedPreferences.getString("cloud_language_pscloud", "en-US") ?: "en-US"
@@ -240,7 +248,19 @@ class Preferences(context: Context)
 
 	fun setCloudLanguage(value: String)
 	{
+		val configured = isCloudLanguageConfigured()
+		val previous = getCloudLanguage()
+		if (configured && previous == value)
+			return
 		sharedPreferences.edit().putString("cloud_language_pscloud", value).apply()
+		Log.i("Preferences", "Cloud locale ${if (configured) "changed" else "configured"}: $previous -> $value")
+		CloudGameRepository.invalidateCatalogCache(appContext)
+	}
+
+	fun setCloudLanguageFromSession(language: String?, country: String?)
+	{
+		val locale = com.metallic.chiaki.cloudplay.CloudLocale.fromSession(language, country) ?: return
+		setCloudLanguage(locale)
 	}
 	
 	// Cloud resolution settings (matching Qt GetCloudResolutionPSNOW/SetCloudResolutionPSNOW)
@@ -265,6 +285,35 @@ class Preferences(context: Context)
 	fun setCloudResolutionPscloud(value: Int)
 	{
 		sharedPreferences.edit().putString(cloudResolutionPscloudKey, value.toString()).apply()
+	}
+
+	// Cloud bitrate settings (matching Qt GetCloudBitratePSCloud/GetCloudBitratePSNOW)
+	val cloudBitratePsnowKey get() = resources.getString(R.string.preferences_cloud_bitrate_psnow_key)
+	val cloudBitratePscloudKey get() = resources.getString(R.string.preferences_cloud_bitrate_pscloud_key)
+
+	private fun clampCloudBitrateKbps(value: Int): Int =
+		value.coerceIn(CLOUD_BITRATE_MIN_KBPS, CLOUD_BITRATE_MAX_KBPS)
+
+	fun getCloudBitratePsnow(): Int
+	{
+		val legacy = sharedPreferences.getInt("cloud_bitrate", CLOUD_BITRATE_DEFAULT_KBPS)
+		return clampCloudBitrateKbps(sharedPreferences.getInt(cloudBitratePsnowKey, legacy))
+	}
+
+	fun setCloudBitratePsnow(value: Int)
+	{
+		sharedPreferences.edit().putInt(cloudBitratePsnowKey, clampCloudBitrateKbps(value)).apply()
+	}
+
+	fun getCloudBitratePscloud(): Int
+	{
+		val legacy = sharedPreferences.getInt("cloud_bitrate", CLOUD_BITRATE_DEFAULT_KBPS)
+		return clampCloudBitrateKbps(sharedPreferences.getInt(cloudBitratePscloudKey, legacy))
+	}
+
+	fun setCloudBitratePscloud(value: Int)
+	{
+		sharedPreferences.edit().putInt(cloudBitratePscloudKey, clampCloudBitrateKbps(value)).apply()
 	}
 
 	// Cloud datacenter settings (matching Qt GetCloudDatacenterPSNOW/SetCloudDatacenterPSNOW)

@@ -36,6 +36,7 @@ import com.metallic.chiaki.common.ext.alertDialogBuilder
 import com.pylux.stream.R
 import com.metallic.chiaki.cloudplay.PsnLoginActivity
 import com.metallic.chiaki.cloudplay.api.CloudStreamingBackend
+import com.metallic.chiaki.cloudplay.api.PsCloudOwnership
 import com.metallic.chiaki.cloudplay.model.CloudError
 import com.metallic.chiaki.cloudplay.model.CloudGame
 import com.metallic.chiaki.common.Preferences
@@ -1028,6 +1029,11 @@ class CloudPlayFragment : Fragment()
 			viewModel.clearError()
 			showError(error)
 		})
+
+		viewModel.warning.observe(viewLifecycleOwner, Observer { warning ->
+			if (warning.isNullOrEmpty()) return@Observer
+			Toast.makeText(requireContext(), warning, Toast.LENGTH_LONG).show()
+		})
 	}
 
 	private fun updateEmptyState(isEmpty: Boolean)
@@ -1337,7 +1343,7 @@ class CloudPlayFragment : Fragment()
 				val backend = CloudStreamingBackend(requireContext(), viewModel.preferences)
 				val result = backend.startCompleteCloudSession(
 					serviceType = game.serviceType,
-					gameIdentifier = game.productId,
+					gameIdentifier = PsCloudOwnership.streamingIdentifier(game),
 					gameName = game.name,
 					npssoToken = npssoToken,
 					onProgress = { message ->
@@ -1515,7 +1521,7 @@ class CloudPlayFragment : Fragment()
 			com.metallic.chiaki.lib.Codec.CODEC_H264
 		}
 		
-		// Get resolution from preferences based on service type
+		// Get resolution and bitrate from preferences based on service type
 		val resolutionValue = if (session.serviceType == "pscloud")
 		{
 			preferences.getCloudResolutionPscloud()
@@ -1524,42 +1530,50 @@ class CloudPlayFragment : Fragment()
 		{
 			preferences.getCloudResolutionPsnow()
 		}
+		val cloudBitrate = if (session.serviceType == "pscloud")
+		{
+			preferences.getCloudBitratePscloud()
+		}
+		else
+		{
+			preferences.getCloudBitratePsnow()
+		}
 		
-		// Create video profile based on resolution
+		// Create video profile based on resolution (bitrate from user setting)
 		val videoProfile = when (resolutionValue) {
 			720 -> com.metallic.chiaki.lib.ConnectVideoProfile(
 				width = 1280,
 				height = 720,
 				maxFPS = 60,
-				bitrate = 20000,  // 20 Mbps for 720p
+				bitrate = cloudBitrate,
 				codec = codec
 			)
 			1080 -> com.metallic.chiaki.lib.ConnectVideoProfile(
 				width = 1920,
 				height = 1080,
 				maxFPS = 60,
-				bitrate = 20000,  // 20 Mbps for 1080p
+				bitrate = cloudBitrate,
 				codec = codec
 			)
 			1440 -> com.metallic.chiaki.lib.ConnectVideoProfile(
 				width = 2560,
 				height = 1440,
 				maxFPS = 60,
-				bitrate = 30000,  // 30 Mbps for 1440p
+				bitrate = cloudBitrate,
 				codec = codec
 			)
 			2160 -> com.metallic.chiaki.lib.ConnectVideoProfile(
 				width = 3840,
 				height = 2160,
 				maxFPS = 60,
-				bitrate = 50000,  // 50 Mbps for 4K
+				bitrate = cloudBitrate,
 				codec = codec
 			)
 			else -> com.metallic.chiaki.lib.ConnectVideoProfile(
 				width = 1280,
 				height = 720,
 				maxFPS = 60,
-				bitrate = 20000,  // 20 Mbps default
+				bitrate = cloudBitrate,
 				codec = codec
 			)
 		}

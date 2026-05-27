@@ -131,6 +131,7 @@ final class PSKamajiSession {
             "Referer": CloudApiConstants.kamajiReferer
         ]), response.statusCode == 200 else { return nil }
 
+        CloudLocaleSettings.applyLocaleFromKamajiSessionBody(response.body)
         return CloudHttpClient.extractCookie(from: response, name: "JSESSIONID")
     }
 
@@ -143,7 +144,9 @@ final class PSKamajiSession {
     }
 
     private func step0_5d_ConvertProductId(sessionId: String) -> ProductConversion? {
-        let url = "\(storeBase)/container/US/en/19/\(productId)?useOffers=true&gkb=1&gkb2=1"
+        let storePath = CloudLocaleSettings.parseStorePath(CloudLocaleSettings.stored)
+        let url = "\(storeBase)/container/\(storePath.country)/\(storePath.language)/19/\(productId)?useOffers=true&gkb=1&gkb2=1"
+        os_log(.info, log: kamajiLog, "Store container locale: %{public}s", CloudLocaleSettings.stored)
 
         guard let response = CloudHttpClient.get(url: url, headers: [
             "Accept": "application/json",

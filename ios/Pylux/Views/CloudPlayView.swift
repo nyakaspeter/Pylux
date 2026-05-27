@@ -33,7 +33,9 @@ final class CloudPlayViewModel: ObservableObject {
 
     @Published var games: [CloudGame] = []
     @Published var loading = false
+    @Published var refreshing = false
     @Published var error: String?
+    @Published var warning: String?
     @Published var currentSection: Section = .library
     @Published var searchQuery = ""
     @Published var sortOrder: SortOrder = .defaultOrder
@@ -102,6 +104,7 @@ final class CloudPlayViewModel: ObservableObject {
     func loadGames(npssoToken: String) {
         loading = true
         error = nil
+        warning = nil
         let section = currentSection
         let ownedOnly = showOwnedOnly
 
@@ -113,7 +116,6 @@ final class CloudPlayViewModel: ObservableObject {
             case .catalog:
                 loadedGames = self.catalogService.fetchPsnowCatalog(npssoToken: npssoToken)
             case .library:
-                // Matches Android: showOnlyOwned toggles between two different fetch paths
                 if ownedOnly {
                     loadedGames = self.catalogService.fetchOwnedPs5Games(npssoToken: npssoToken)
                 } else {
@@ -122,26 +124,50 @@ final class CloudPlayViewModel: ObservableObject {
             }
 
             await MainActor.run {
-                self.games = loadedGames
-                self.loading = false
-                if loadedGames.isEmpty {
-                    self.error = section == .library
-                        ? "No cloud games found. Check your connection."
-                        : "Failed to load catalog. Check your connection."
-                }
+                self.applyLoadedGames(loadedGames, section: section)
+            }
+        }
+    }
+
+    private func applyLoadedGames(_ loadedGames: [CloudGame], section: Section) {
+        games = loadedGames
+        loading = false
+        if let fetchError = catalogService.lastLibraryFetchError {
+            error = fetchError
+        } else if loadedGames.isEmpty {
+            error = section == .library
+                ? "No cloud games found. Check your connection."
+                : "Failed to load catalog. Check your connection."
+        }
+        if section == .library {
+            if let catalogWarning = catalogService.lastCatalogFetchWarning {
+                warning = catalogWarning
+            } else if let libraryWarning = catalogService.lastLibraryFetchWarning {
+                warning = libraryWarning
+            } else if !CloudLocaleSettings.isConfigured {
+                warning = CloudLocaleSettings.unconfiguredWarning()
             }
         }
     }
 
     func refreshGames(npssoToken: String) {
+        guard !refreshing else { return }
+        refreshing = true
         loading = true
         error = nil
+        warning = nil
         let section = currentSection
         let ownedOnly = showOwnedOnly
 
         Task.detached(priority: .userInitiated) { [weak self] in
-            guard let self = self else { return }
             let loadedGames: [CloudGame]
+            defer {
+                Task { @MainActor in
+                    self?.loading = false
+                    self?.refreshing = false
+                }
+            }
+            guard let self = self else { return }
 
             switch section {
             case .catalog:
@@ -155,8 +181,7 @@ final class CloudPlayViewModel: ObservableObject {
             }
 
             await MainActor.run {
-                self.games = loadedGames
-                self.loading = false
+                self.applyLoadedGames(loadedGames, section: section)
             }
         }
     }
@@ -170,7 +195,7 @@ final class CloudPlayViewModel: ObservableObject {
 
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self = self else { return }
-            let gameIdentifier = game.id
+            let gameIdentifier = game.streamingIdentifier
             let gameName = game.name
             let serviceType = game.serviceType
             var cancelled = false
@@ -257,6 +282,15 @@ struct CloudPlayView: View {
                     VStack(spacing: 0) {
                         // Sub-tabs: Catalog / Library
                         cloudSubTabs
+
+                        if let warning = viewModel.warning {
+                            Text(warning)
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                        }
 
                         // Search bar (when visible)
                         if showSearch {
@@ -457,11 +491,20 @@ struct CloudPlayView: View {
                 Button {
                     viewModel.refreshGames(npssoToken: npssoToken)
                 } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.45))
-                        .frame(width: 28, height: 28)
+                    Group {
+                        if viewModel.refreshing {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white.opacity(0.7)))
+                                .scaleEffect(0.65)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 12))
+                                .foregroundColor(.white.opacity(0.45))
+                        }
+                    }
+                    .frame(width: 28, height: 28)
                 }
+                .disabled(viewModel.refreshing)
             }
         }
         .padding(.horizontal, 10)
@@ -964,6 +1007,7 @@ struct CloudStreamWrapperView: View {
         let cloudRes = cloudSession.serviceType == "pscloud"
             ? prefs.cloudResolutionDimensionsPscloud
             : prefs.cloudResolutionDimensionsPsnow
+        let cloudBitrate = prefs.cloudBitrateKbps(for: cloudSession.serviceType)
 
         return StreamConnectInfo(
             host: cloudSession.serverIp,
@@ -973,7 +1017,7 @@ struct CloudStreamWrapperView: View {
             videoWidth: UInt32(cloudRes.width),
             videoHeight: UInt32(cloudRes.height),
             videoMaxFps: 60,
-            videoBitrate: UInt32(prefs.effectiveBitrate),
+            videoBitrate: UInt32(cloudBitrate),
             videoCodec: cloudSession.serviceType == "pscloud" ? 1 : 0,
             serviceType: cloudSession.serviceType == "pscloud" ? 2 : 1,
             cloudLaunchSpec: cloudSession.launchSpec,

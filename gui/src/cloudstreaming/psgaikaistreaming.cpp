@@ -1485,15 +1485,17 @@ void PSGaikaiStreaming::step13_AllocateSlot()
     
     // Network info (use real values from ping results, port from step12 response)
     QJsonObject network;
-    // High bandwidth values to ensure PS servers accept the connection
-    network["bwKbpsSent"] = 50000;        // 50 Mbps upload (very high for server acceptance)
-    network["bwLoss"] = 0.001;            // 0.1% packet loss (excellent)
+    const unsigned int cloud_bw_kbps = serviceType == "pscloud"
+        ? settings->GetCloudBitratePSCloud()
+        : settings->GetCloudBitratePSNOW();
+    network["bwKbpsSent"] = static_cast<int>(cloud_bw_kbps);
+    network["bwLoss"] = 0.001;
     // Use real MTU values from ping results, with fallback to defaults
     network["mtu"] = selectedDatacenterPingResult["mtu_in"].toInt(1454);
     network["rtt"] = selectedDatacenterPingResult["rtt"].toInt(25);
     network["port"] = selectedDatacenterPort;  // Use port from step12 (dynamic)
-    network["bwKbpsReceived"] = 200000;   // 200 Mbps download (very high for server acceptance)
-    network["bwLossUpstream"] = 0;         // No upstream packet loss (excellent)
+    network["bwKbpsReceived"] = static_cast<int>(cloud_bw_kbps);
+    network["bwLossUpstream"] = 0;
     // Use real outbound MTU from ping results, with fallback to default
     network["mtuUpstream"] = selectedDatacenterPingResult["mtu_out"].toInt(1254);
     body["network"] = network;

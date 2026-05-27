@@ -5,8 +5,9 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](https://github.com/ForWard-Technologies-LLC/Pylux/blob/master/LICENSES/AGPL-3.0-only-OpenSSL.txt)
 [![Platforms](https://img.shields.io/badge/platforms-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Windows%20%7C%20Linux-brightgreen)](https://github.com/ForWard-Technologies-LLC/Pylux/releases)
+[![Reddit: r/Pylux](https://img.shields.io/badge/Reddit-r%2FPylux-FF4500?logo=reddit&logoColor=white)](https://www.reddit.com/r/Pylux/)
 
-**Pylux is a free, open-source PS4 and PS5 Remote Play client for Android, Android TV, iOS, macOS, Windows, Linux, and Steam Deck.** It focuses on app-store installs, Internet Play (streaming the game catalog or your owned games), automatic console discovery, and a touch-friendly mobile UI — all from one community-maintained codebase.
+**Pylux is a free, open-source, community build PS4 and PS5 Remote Play client for Android, Android TV, iOS, macOS, Windows, Linux, and Steam Deck.** It focuses on app-store installs, Internet Play (streaming the game catalog or your owned games), automatic console discovery, and a touch-friendly mobile UI — all from one community-maintained codebase.
 
 ## Download
 
@@ -15,19 +16,6 @@
 <a href="https://apps.apple.com/us/app/pylux-remote-play/id6761292658"><img src="assets/app-store-badge.svg" height="50" alt="Download on the App Store"></a>&nbsp;<a href="https://apps.apple.com/us/app/pylux-remote-play/id6761292658"><img src="assets/mac-app-store-badge.svg" height="50" alt="Download on the Mac App Store"></a>
 
 <a href="https://flathub.org/apps/io.github.ForWard_Technologies_LLC.Pylux"><img src="assets/flathub-badge.svg" height="50" alt="Get it on Flathub"></a>&nbsp;<a href="https://www.dropbox.com/scl/fi/wi8bjilwiklv7fde0b4ea/pylux-latest.AppImage?rlkey=3xne4ltuiq54ogfmng4gq24mp&dl=1"><img src="assets/linux-appimage-badge.svg" height="50" alt="Download AppImage"></a>
-
-**Steam Deck / Flathub Note**:
-
-Pylux is not available in the Steam Deck Discover store yet. Flathub’s review process is slow, so until the listing is approved you need to install it manually using the commands below. I will remove this section once Pylux is available on Flathub.
-
-Install:
-```
-curl -fsSL -o pylux-latest.flatpak "https://www.dropbox.com/scl/fi/zho2yrnso8u28rbx0jkwt/pylux-latest.flatpak?rlkey=kjftxhac24g43li6vpouqding&dl=1" && flatpak install --user -y pylux-latest.flatpak
-```
-Run:
-```
-flatpak run io.github.ForWard_Technologies_LLC.Pylux
-```
 
 For full release notes and all downloads see the [Releases page](https://github.com/ForWard-Technologies-LLC/Pylux/releases).
 
@@ -45,7 +33,7 @@ For full release notes and all downloads see the [Releases page](https://github.
 - **Internet Play** — stream games from the game catalog or your owned game library
 - **Remote Play** — low-latency streaming of your PlayStation console to any supported device
 - **Cross-platform** — Android, Android TV, iOS, iPadOS, macOS, Windows, Linux, Steam Deck
-- **App-store installs** — available on Google Play, App Store, and Mac App Store
+- **App-store installs** — available on Google Play, App Store, Mac App Store, and [Flathub](https://flathub.org/apps/io.github.ForWard_Technologies_LLC.Pylux) (Linux / Steam Deck)
 - **Automatic console discovery and registration**
 - **Touch-friendly controls** — mobile-optimized UI for phones and tablets
 

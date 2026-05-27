@@ -206,6 +206,127 @@ Pane {
         });
     }
     
+    function ps5CloudProductId(game) {
+        if (!game)
+            return "";
+        return game.productId || game.product_id || "";
+    }
+
+    function ps5CloudConceptId(game) {
+        if (!game)
+            return "";
+        let conceptId = game.conceptId;
+        if (conceptId === undefined || conceptId === null || conceptId === "")
+            return "";
+        return String(conceptId);
+    }
+
+    function ps5CloudStreamingId(game) {
+        if (!game)
+            return "";
+        return game.id || "";
+    }
+
+    function buildPs5CloudCatalogIndex(games) {
+        let byProductId = {};
+        let byConceptId = {};
+        for (let i = 0; i < games.length; i++) {
+            let game = games[i];
+            let productId = ps5CloudProductId(game);
+            if (productId)
+                byProductId[productId] = i;
+            let conceptId = ps5CloudConceptId(game);
+            if (conceptId)
+                byConceptId[conceptId] = i;
+            let streamId = ps5CloudStreamingId(game);
+            if (streamId && streamId !== productId)
+                byProductId[streamId] = i;
+        }
+        return { byProductId: byProductId, byConceptId: byConceptId };
+    }
+
+    function registerPs5CloudGameInCatalogIndex(game, index, catalogIndex) {
+        let productId = ps5CloudProductId(game);
+        if (productId)
+            catalogIndex.byProductId[productId] = index;
+        let conceptId = ps5CloudConceptId(game);
+        if (conceptId)
+            catalogIndex.byConceptId[conceptId] = index;
+        let streamId = ps5CloudStreamingId(game);
+        if (streamId && streamId !== productId)
+            catalogIndex.byProductId[streamId] = index;
+    }
+
+    function findPs5CloudCatalogIndexForOwned(ownedGame, catalogIndex) {
+        let productId = ps5CloudProductId(ownedGame);
+        if (productId && catalogIndex.byProductId.hasOwnProperty(productId))
+            return catalogIndex.byProductId[productId];
+        let streamId = ps5CloudStreamingId(ownedGame);
+        if (streamId && catalogIndex.byProductId.hasOwnProperty(streamId))
+            return catalogIndex.byProductId[streamId];
+        let conceptId = ps5CloudConceptId(ownedGame);
+        if (conceptId && catalogIndex.byConceptId.hasOwnProperty(conceptId))
+            return catalogIndex.byConceptId[conceptId];
+        return -1;
+    }
+
+    function sortPs5CloudLibraryGames(games) {
+        games.sort(function(a, b) {
+            if (a.isOwned && !b.isOwned)
+                return -1;
+            if (!a.isOwned && b.isOwned)
+                return 1;
+            let nameA = (a.name || (a.game_meta && a.game_meta.name) || "").toLowerCase();
+            let nameB = (b.name || (b.game_meta && b.game_meta.name) || "").toLowerCase();
+            return nameA.localeCompare(nameB);
+        });
+    }
+
+    function mergeOwnedPs5CloudIntoBrowseCatalog(browseGames, ownedGames) {
+        let games = browseGames.slice();
+        let catalogIndex = buildPs5CloudCatalogIndex(games);
+        let ownedIds = new Set();
+
+        for (let i = 0; i < ownedGames.length; i++) {
+            let ownedGame = ownedGames[i];
+            let productId = ps5CloudProductId(ownedGame);
+            if (productId)
+                ownedIds.add(productId);
+            let streamId = ps5CloudStreamingId(ownedGame);
+            if (streamId)
+                ownedIds.add(streamId);
+
+            let catalogMatch = findPs5CloudCatalogIndexForOwned(ownedGame, catalogIndex);
+            if (catalogMatch >= 0) {
+                let existing = games[catalogMatch];
+                existing.isOwned = true;
+                let streamId = ps5CloudStreamingId(ownedGame);
+                if (streamId)
+                    existing.id = streamId;
+                let ownedProductId = ps5CloudProductId(ownedGame);
+                if (ownedProductId) {
+                    if (!existing.product_id)
+                        existing.product_id = ownedProductId;
+                    if (!existing.productId)
+                        existing.productId = ownedProductId;
+                }
+                games[catalogMatch] = existing;
+                continue;
+            }
+
+            let entry = Object.assign({}, ownedGame);
+            entry.isOwned = true;
+            if (!entry.productId && entry.product_id)
+                entry.productId = entry.product_id;
+
+            registerPs5CloudGameInCatalogIndex(entry, games.length, catalogIndex);
+            games.push(entry);
+        }
+
+        sortPs5CloudLibraryGames(games);
+        return { games: games, ownedIds: ownedIds };
+    }
+
     function loadPs5CloudLibrary() {
         // Clear old cards immediately when starting to load
         allGames = [];
@@ -220,56 +341,33 @@ Pane {
                     try {
                         let data = JSON.parse(jsonData);
                         if (data.games && Array.isArray(data.games)) {
+                            if (message && message !== "Success" && message !== "Cached")
+                                showErrorToast(qsTr("Partial Catalog"), message);
                             // Also fetch owned games to mark which ones are owned
                             Chiaki.cloudCatalog.getOwnedPs5CloudGames(function(ownedSuccess, ownedMessage, ownedJsonData) {
-                                let ownedIds = new Set();
                                 let ownershipCheckFailed = false;
                                 let ownershipErrorMsg = "";
+                                let ownedGames = [];
                                 
                                 if (ownedSuccess && ownedJsonData) {
                                     try {
                                         let ownedData = JSON.parse(ownedJsonData);
-                                        if (ownedData.games && Array.isArray(ownedData.games)) {
-                                            for (let i = 0; i < ownedData.games.length; i++) {
-                                                let game = ownedData.games[i];
-                                                let productId = game.product_id || game.productId;
-                                                if (productId) {
-                                                    ownedIds.add(productId);
-                                                }
-                                            }
-                                        }
+                                        if (ownedData.games && Array.isArray(ownedData.games))
+                                            ownedGames = ownedData.games;
                                     } catch (e) {
                                         console.warn("Failed to parse owned games for filtering:", e);
                                         ownershipCheckFailed = true;
                                         ownershipErrorMsg = qsTr("Failed to parse ownership data. Some games may show incorrect ownership status.");
                                     }
                                 } else {
-                                    // Ownership check failed - network error, auth error, or API error
                                     console.warn("Failed to fetch owned games:", ownedMessage);
                                     ownershipCheckFailed = true;
                                     ownershipErrorMsg = ownedMessage || qsTr("Failed to verify game ownership");
                                 }
-                                
-                                // Mark games as owned or not (will all be false if ownership check failed)
-                                for (let i = 0; i < data.games.length; i++) {
-                                    let game = data.games[i];
-                                    let productId = game.productId || game.product_id;
-                                    data.games[i].isOwned = ownedIds.has(productId);
-                                }
-                                
-                                // Sort so owned games appear first
-                                data.games.sort(function(a, b) {
-                                    // Owned games first
-                                    if (a.isOwned && !b.isOwned) return -1;
-                                    if (!a.isOwned && b.isOwned) return 1;
-                                    // Then sort alphabetically by name
-                                    let nameA = (a.name || (a.game_meta && a.game_meta.name) || "").toLowerCase();
-                                    let nameB = (b.name || (b.game_meta && b.game_meta.name) || "").toLowerCase();
-                                    return nameA.localeCompare(nameB);
-                                });
-                                
-                                ownedProductIds = Array.from(ownedIds);
-                                allGames = data.games;
+
+                                let merged = mergeOwnedPs5CloudIntoBrowseCatalog(data.games, ownedGames);
+                                ownedProductIds = Array.from(merged.ownedIds);
+                                allGames = merged.games;
                                 isLoading = false;
                                 
                                 // Handle ownership check failure with user-visible feedback
@@ -332,19 +430,19 @@ Pane {
                     try {
                         let data = JSON.parse(jsonData);
                         if (data.games && Array.isArray(data.games)) {
-                            // Mark all as owned since they come from the owned games endpoint
-                            for (let i = 0; i < data.games.length; i++) {
+                            for (let i = 0; i < data.games.length; i++)
                                 data.games[i].isOwned = true;
-                            }
-                            
-                            // Track owned product IDs
+
+                            sortPs5CloudLibraryGames(data.games);
+
                             let ownedIds = new Set();
                             for (let i = 0; i < data.games.length; i++) {
-                                let game = data.games[i];
-                                let productId = game.product_id || game.productId;
-                                if (productId) {
+                                let productId = ps5CloudProductId(data.games[i]);
+                                if (productId)
                                     ownedIds.add(productId);
-                                }
+                                let streamId = ps5CloudStreamingId(data.games[i]);
+                                if (streamId)
+                                    ownedIds.add(streamId);
                             }
                             ownedProductIds = Array.from(ownedIds);
                             

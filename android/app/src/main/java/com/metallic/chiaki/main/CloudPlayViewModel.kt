@@ -8,6 +8,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.metallic.chiaki.cloudplay.CloudLocale
 import com.metallic.chiaki.cloudplay.model.CloudGame
 import com.metallic.chiaki.cloudplay.model.PsnResult
 import com.metallic.chiaki.cloudplay.repository.CloudGameRepository
@@ -38,6 +39,9 @@ class CloudPlayViewModel(
 	
 	private val _error = MutableLiveData<String?>()
 	val error: LiveData<String?> get() = _error
+
+	private val _warning = MutableLiveData<String?>()
+	val warning: LiveData<String?> get() = _warning
 	
 	private val _searchQuery = MutableLiveData<String>()
 	val searchQuery: LiveData<String> get() = _searchQuery
@@ -65,6 +69,7 @@ class CloudPlayViewModel(
 			{
 				_loading.value = true
 				_error.value = null
+				_warning.value = null
 				
 				Log.i(TAG, "Fetching PSNow catalog (forceRefresh=$forceRefresh)")
 				
@@ -108,6 +113,7 @@ class CloudPlayViewModel(
 			{
 				_loading.value = true
 				_error.value = null
+				_warning.value = null
 				
 				val npssoToken = preferences.getNpssoToken()
 				
@@ -121,6 +127,7 @@ class CloudPlayViewModel(
 						{
 							allGames = result.data
 							Log.i(TAG, "Successfully loaded ${allGames.size} owned PS5 games")
+							repository.lastCatalogFetchWarning?.let { _warning.value = it }
 							applySearchFilter()
 						}
 						is PsnResult.Error ->
@@ -140,6 +147,7 @@ class CloudPlayViewModel(
 						{
 							allGames = result.data
 							Log.i(TAG, "Successfully loaded ${allGames.size} PS5 games")
+							repository.lastCatalogFetchWarning?.let { _warning.value = it }
 							applySearchFilter()
 						}
 						is PsnResult.Error ->
@@ -157,6 +165,7 @@ class CloudPlayViewModel(
 			}
 			finally
 			{
+				updateLocaleWarningIfNeeded()
 				_loading.value = false
 			}
 		}
@@ -254,6 +263,14 @@ class CloudPlayViewModel(
 	fun getAllCachedGames(): List<CloudGame>
 	{
 		return allGames
+	}
+
+	private fun updateLocaleWarningIfNeeded()
+	{
+		if (!_warning.value.isNullOrEmpty())
+			return
+		if (!preferences.isCloudLanguageConfigured())
+			_warning.value = CloudLocale.unconfiguredWarning()
 	}
 }
 

@@ -46,6 +46,10 @@ final class CloudStreamingBackend {
         }
         os_log(.info, log: cloudLog, "✓ Authorization check passed")
 
+        if normalizedServiceType == "pscloud" {
+            CloudLocaleSettings.ensureConfigured(npssoToken: npssoToken)
+        }
+
         // Continue with session setup
         return try continueCloudSessionAfterAuth(
             serviceType: normalizedServiceType,

@@ -162,6 +162,9 @@ final class SecureStore {
     private let kLastDonationPromptWallMs = "pylux.lastDonationPromptWallMs"
     private let kDonationPaywallShowCount = "pylux.donationPaywallShowCount"
 
+    // App Store review prompt (Apple SKStoreReviewController)
+    private let kLastAppReviewPromptTotalStreamMs = "pylux.lastAppReviewPromptTotalStreamMs"
+
     // Last connect info (ConnectInfoEntryView)
     private let kLastHost       = "pylux.lastHost"
     private let kLastRegistKey  = "pylux.lastRegistKey"
@@ -301,6 +304,15 @@ final class SecureStore {
         return next
     }
 
+    // MARK: - App Store Review Prompt
+
+    /// `totalStreamTimeMs` at the moment of the last `SKStoreReviewController.requestReview(in:)` call.
+    /// `0` means we have never requested a review.
+    var lastAppReviewPromptTotalStreamMs: Int64 {
+        get { Int64(KC.readString(kLastAppReviewPromptTotalStreamMs) ?? "0") ?? 0 }
+        set { KC.writeString(kLastAppReviewPromptTotalStreamMs, String(newValue)) }
+    }
+
     // MARK: - Last Connect Info (ConnectInfoEntryView)
 
     var lastHost: String {
@@ -349,6 +361,7 @@ final class SecureStore {
             kDcPscloud, kDcPsnow,
             kCloudFavorites, kCloudSortState,
             kTotalStreamTimeMs, kLastDonationPromptWallMs, kDonationPaywallShowCount,
+            kLastAppReviewPromptTotalStreamMs,
             kLastHost, kLastRegistKey, kLastMorning, kLastPs5,
             kLastResolution, kLastFps, kLastCodec,
         ]

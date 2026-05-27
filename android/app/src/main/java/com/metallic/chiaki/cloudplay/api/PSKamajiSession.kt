@@ -279,10 +279,8 @@ class PSKamajiSession(
 				
 				if (!sessionCountry.isNullOrEmpty() && !sessionLanguage.isNullOrEmpty())
 				{
-					// Format: language-COUNTRY (e.g., "nl-NL" or "en-US")
-					val locale = "$sessionLanguage-${sessionCountry.uppercase()}"
-					preferences.setCloudLanguage(locale)
-					Log.i(TAG, "Saved locale from session: $locale")
+					preferences.setCloudLanguageFromSession(sessionLanguage, sessionCountry)
+					Log.i(TAG, "Saved locale from session: ${preferences.getCloudLanguage()}")
 				}
 			}
 		}
@@ -310,18 +308,9 @@ class PSKamajiSession(
 	{
 		try
 		{
-		// Get locale from unified language setting (Qt line 321: GetCloudLanguagePSCloud)
-		// Qt uses ONE setting for both PSNow and PSCloud
-		val localeSetting = preferences.getCloudLanguage() // Default "en-US"
-		val locale = localeSetting.lowercase() // Convert "en-US" to "en-us"
-		
-		// Extract country and language from locale (e.g., "en-us" -> "US", "en")
-		val localeParts = locale.split("-")
-		val country = if (localeParts.size > 1) localeParts[1].uppercase() else "US"
-		val language = if (localeParts.isNotEmpty()) localeParts[0].lowercase() else "en"
-		
+		val localeSetting = preferences.getCloudLanguage()
+		val (country, language) = com.metallic.chiaki.cloudplay.CloudLocale.parseStorePath(localeSetting)
 		Log.i(TAG, "Using locale from settings: $localeSetting -> country=$country, language=$language")
-		
 		val url = "$storeBase/container/$country/$language/19/$productId?useOffers=true&gkb=1&gkb2=1"
 			
 			Log.d(TAG, "Step 0.5d: Convert Product ID")

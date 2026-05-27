@@ -314,6 +314,10 @@ class Settings : public QObject
 		void SetCloudDatacenterPSCloud(const QString &datacenter);
 		QString GetCloudDatacentersJsonPSCloud() const;  // JSON array of datacenters with ping results
 		void SetCloudDatacentersJsonPSCloud(const QString &json);
+		unsigned int GetCloudBitratePSCloud() const;
+		void SetCloudBitratePSCloud(unsigned int bitrate_kbps);
+		unsigned int GetCloudBitratePSNOW() const;
+		void SetCloudBitratePSNOW(unsigned int bitrate_kbps);
 
 		// PSNOW settings
 		int GetCloudResolutionPSNOW() const;
@@ -324,6 +328,8 @@ class Settings : public QObject
 		void SetCloudDatacenterPSNOW(const QString &datacenter);
 		QString GetCloudDatacentersJsonPSNOW() const;  // JSON array of datacenters with ping results
 		void SetCloudDatacentersJsonPSNOW(const QString &json);
+
+		ChiakiConnectVideoProfile GetCloudVideoProfile(const QString &serviceType) const;
 
 		/**
 		 * @return 0 if set to "automatic"
@@ -760,6 +766,11 @@ class Settings : public QObject
 		void SetDonationPromptShowCount(int count)          { settings.setValue("settings/donation_prompt_show_count", count); }
 		bool GetDonationCachedStatus(bool *outStatus) const;
 		void SetDonationCachedStatus(bool donated);
+
+		// App Store review prompt (Mac App Store only): `donation_total_stream_time_ms`
+		// snapshot at the last `SKStoreReviewController.requestReview` call. 0 = never requested.
+		qint64 GetAppReviewLastPromptTotalStreamMs() const  { return settings.value("settings/app_review_last_prompt_total_stream_ms", 0).toLongLong(); }
+		void SetAppReviewLastPromptTotalStreamMs(qint64 ms) { settings.setValue("settings/app_review_last_prompt_total_stream_ms", ms); }
 
 	signals:
 		void RegisteredHostsUpdated();

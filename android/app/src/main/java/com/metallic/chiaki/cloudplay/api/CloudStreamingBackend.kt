@@ -4,6 +4,7 @@ package com.metallic.chiaki.cloudplay.api
 
 import android.content.Context
 import android.util.Log
+import com.metallic.chiaki.cloudplay.CloudLocaleBootstrap
 import com.metallic.chiaki.cloudplay.DuidUtil
 import com.metallic.chiaki.cloudplay.PsnApiConstants
 import com.metallic.chiaki.cloudplay.model.CloudStreamSession
@@ -95,6 +96,10 @@ class CloudStreamingBackend(
 			}
 			
 			Log.i(TAG, "✓ Authorization check passed")
+
+			// PSCloud skips Kamaji; bootstrap locale once if PSNow never ran
+			if (normalizedServiceType == "pscloud")
+				CloudLocaleBootstrap.ensureConfigured(preferences, npssoToken)
 			
 			// Continue with cloud session setup
 			val result = continueCloudSessionAfterAuth(
