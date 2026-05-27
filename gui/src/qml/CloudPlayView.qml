@@ -341,6 +341,8 @@ Pane {
                     try {
                         let data = JSON.parse(jsonData);
                         if (data.games && Array.isArray(data.games)) {
+                            if (message && message !== "Success" && message !== "Cached")
+                                showErrorToast(qsTr("Partial Catalog"), message);
                             // Also fetch owned games to mark which ones are owned
                             Chiaki.cloudCatalog.getOwnedPs5CloudGames(function(ownedSuccess, ownedMessage, ownedJsonData) {
                                 let ownershipCheckFailed = false;

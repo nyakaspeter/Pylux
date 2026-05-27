@@ -51,7 +51,7 @@ enum PsCloudOwnership {
             supplementMap[game.id] = game
         }
 
-        var ownedGames: [CloudGame] = []
+        var byKey: [String: CloudGame] = [:]
         for ent in filteredEntitlements {
             let meta: CloudGame?
             if !ent.productId.isEmpty, let g = catalogMap[ent.productId] {
@@ -65,15 +65,46 @@ enum PsCloudOwnership {
                 meta = nil
             }
 
-            guard var game = meta else { continue }
+            guard let meta else { continue }
 
-            game.isOwned = true
-            game.entitlementId = ent.id
-            game.storeProductId = ent.productId
-            ownedGames.append(game)
+            let displayName = meta.name.isEmpty ? ent.name : meta.name
+            var game = CloudGame(
+                productId: meta.id,
+                name: displayName,
+                imageUrl: meta.imageUrl,
+                landscapeImageUrl: meta.landscapeImageUrl,
+                platform: meta.platform,
+                serviceType: meta.serviceType,
+                conceptUrl: meta.conceptUrl,
+                conceptId: meta.conceptId,
+                isOwned: true,
+                entitlementId: ent.id,
+                storeProductId: ent.productId
+            )
+
+            let key = ownedDedupeKey(meta: meta, ent: ent)
+            if let existing = byKey[key] {
+                byKey[key] = preferOwnedEntry(existing: existing, candidate: game)
+            } else {
+                byKey[key] = game
+            }
         }
 
-        return ownedGames
+        return Array(byKey.values)
+    }
+
+    private static func ownedDedupeKey(meta: CloudGame, ent: PsCloudEntitlement) -> String {
+        if !meta.conceptId.isEmpty { return "c:\(meta.conceptId)" }
+        if !meta.id.isEmpty { return "p:\(meta.id)" }
+        if !ent.id.isEmpty { return "e:\(ent.id)" }
+        return "u:\(meta.id):\(ent.id)"
+    }
+
+    private static func preferOwnedEntry(existing: CloudGame, candidate: CloudGame) -> CloudGame {
+        if existing.entitlementId.isEmpty, !candidate.entitlementId.isEmpty {
+            return candidate
+        }
+        return existing
     }
 
     static func mergeOwnedIntoBrowseCatalog(

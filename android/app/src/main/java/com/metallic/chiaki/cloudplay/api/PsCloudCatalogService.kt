@@ -15,6 +15,8 @@ data class Ps5CloudCatalogResult(
 	val browseGames: List<CloudGame>,
 	val plusLibrarySupplement: List<CloudGame>,
 	val productIdAliases: Map<String, String> = emptyMap(),
+	val catalogFetchWarning: String? = null,
+	val shouldCacheV3: Boolean = true,
 )
 
 /**
@@ -47,24 +49,50 @@ class PsCloudCatalogService
 		val plusSupplementByProductId = LinkedHashMap<String, JSONObject>()
 		val productIdAliases = LinkedHashMap<String, String>()
 		var totalGames = 0
+		val failedLists = mutableListOf<String>()
+		var allPs5ListSucceeded = false
 
 		IMAGIC_PS5_CLOUD_CATEGORY_LISTS.map { categoryList ->
-			async { categoryList to fetchImagicCategoryList(locale, categoryList) }
+			async {
+				try {
+					categoryList to fetchImagicCategoryList(locale, categoryList)
+				} catch (e: Exception) {
+					Log.w(TAG, "Imagic list '$categoryList' failed: ${e.message}")
+					categoryList to null
+				}
+			}
 		}.awaitAll().forEach { (categoryList, jsonArray) ->
+			if (jsonArray == null) {
+				failedLists.add(categoryList)
+				return@forEach
+			}
+			if (categoryList == "all-ps5-list")
+				allPs5ListSucceeded = true
 			totalGames += mergeImagicCategoryIntoMap(
 				categoryList, jsonArray, byConceptId, plusSupplementByProductId, productIdAliases
 			)
 		}
 
+		if (failedLists.size == IMAGIC_PS5_CLOUD_CATEGORY_LISTS.size)
+			throw Exception("All imagic lists failed to load")
+
 		val browseGames = byConceptId.values.mapNotNull { jsonToCloudGame(it) }
 		val plusLibrarySupplement = plusSupplementByProductId.values.mapNotNull { jsonToCloudGame(it) }
+
+		val catalogFetchWarning = if (failedLists.isEmpty()) null
+			else "Some catalog lists failed to load (${failedLists.joinToString()}). Catalog may be incomplete."
 
 		Log.i(TAG, "  Imagic rows scanned: $totalGames")
 		Log.i(TAG, "  PS5 streaming games (deduped by conceptId): ${browseGames.size}")
 		Log.i(TAG, "  Plus library-stream supplement (stream=false): ${plusLibrarySupplement.size}")
 		Log.i(TAG, "  Product ID aliases (same conceptId): ${productIdAliases.size}")
+		if (catalogFetchWarning != null)
+			Log.w(TAG, "  Partial imagic fetch: $catalogFetchWarning")
 
-		Ps5CloudCatalogResult(browseGames, plusLibrarySupplement, productIdAliases)
+		Ps5CloudCatalogResult(
+			browseGames, plusLibrarySupplement, productIdAliases,
+			catalogFetchWarning, allPs5ListSucceeded
+		)
 	}
 
 	private suspend fun fetchImagicCategoryList(locale: String, categoryList: String): JSONArray

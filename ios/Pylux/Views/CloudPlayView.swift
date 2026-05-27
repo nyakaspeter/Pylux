@@ -139,8 +139,14 @@ final class CloudPlayViewModel: ObservableObject {
                 ? "No cloud games found. Check your connection."
                 : "Failed to load catalog. Check your connection."
         }
-        if section == .library && !CloudLocaleSettings.isConfigured {
-            warning = CloudLocaleSettings.unconfiguredWarning()
+        if section == .library {
+            if let catalogWarning = catalogService.lastCatalogFetchWarning {
+                warning = catalogWarning
+            } else if let libraryWarning = catalogService.lastLibraryFetchWarning {
+                warning = libraryWarning
+            } else if !CloudLocaleSettings.isConfigured {
+                warning = CloudLocaleSettings.unconfiguredWarning()
+            }
         }
     }
 

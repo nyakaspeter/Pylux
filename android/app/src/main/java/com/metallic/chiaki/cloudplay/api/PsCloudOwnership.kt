@@ -55,15 +55,15 @@ object PsCloudOwnership
 		productIdAliases: Map<String, String> = emptyMap(),
 	): List<CloudGame>
 	{
-		val catalogMap = publicCatalog.associateBy { it.productId }.toMutableMap()
+		val catalogMap = catalogMapFirstWins(publicCatalog)
 		for ((alias, canonical) in productIdAliases)
 		{
 			if (alias in catalogMap)
 				continue
 			catalogMap[canonical]?.let { catalogMap[alias] = it }
 		}
-		val supplementMap = plusLibrarySupplement.associateBy { it.productId }
-		val ownedGames = mutableListOf<CloudGame>()
+		val supplementMap = catalogMapFirstWins(plusLibrarySupplement)
+		val byKey = linkedMapOf<String, CloudGame>()
 
 		for (ent in filteredEntitlements)
 		{
@@ -79,17 +79,46 @@ object PsCloudOwnership
 			} ?: continue
 
 			val displayName = meta.name.ifEmpty { ent.name }
-			ownedGames.add(
-				meta.copy(
-					name = displayName,
-					isOwned = true,
-					entitlementId = ent.id,
-					storeProductId = ent.productId
-				)
+			val game = meta.copy(
+				name = displayName,
+				isOwned = true,
+				entitlementId = ent.id,
+				storeProductId = ent.productId
 			)
+			val key = ownedDedupeKey(meta, ent)
+			val existing = byKey[key]
+			byKey[key] = if (existing == null) game else preferOwnedEntry(existing, game)
 		}
 
-		return ownedGames
+		return byKey.values.toList()
+	}
+
+	private fun ownedDedupeKey(meta: CloudGame, ent: Entitlement): String
+	{
+		if (meta.conceptId.isNotEmpty()) return "c:${meta.conceptId}"
+		if (meta.productId.isNotEmpty()) return "p:${meta.productId}"
+		if (ent.id.isNotEmpty()) return "e:${ent.id}"
+		return "u:${meta.productId}:${ent.id}"
+	}
+
+	private fun preferOwnedEntry(existing: CloudGame, candidate: CloudGame): CloudGame
+	{
+		return when
+		{
+			existing.entitlementId.isEmpty() && candidate.entitlementId.isNotEmpty() -> candidate
+			else -> existing
+		}
+	}
+
+	private fun catalogMapFirstWins(games: List<CloudGame>): MutableMap<String, CloudGame>
+	{
+		val map = linkedMapOf<String, CloudGame>()
+		for (game in games)
+		{
+			if (game.productId.isNotEmpty() && game.productId !in map)
+				map[game.productId] = game
+		}
+		return map
 	}
 
 	fun mergeOwnedIntoBrowseCatalog(

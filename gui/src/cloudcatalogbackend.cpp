@@ -131,6 +131,30 @@ QString CloudCatalogBackend::getCachedData(const QString &key, int maxAge)
     return QString::fromUtf8(data);
 }
 
+QString CloudCatalogBackend::getCachedPs5CatalogV3(int maxAge)
+{
+    const QString cached = getCachedData(QStringLiteral("ps5_cloud_catalog_v3"), maxAge);
+    if (cached.isEmpty())
+        return QString();
+
+    const QJsonDocument doc = QJsonDocument::fromJson(cached.toUtf8());
+    if (!doc.isObject()) {
+        QFile::remove(getCacheFilePath(QStringLiteral("ps5_cloud_catalog_v3")));
+        return QString();
+    }
+
+    const QString expectedLocale = settings ? settings->GetCloudLanguagePSCloud() : QStringLiteral("en-US");
+    const QString cachedLocale = doc.object().value(QStringLiteral("locale")).toString();
+    if (!cachedLocale.isEmpty() && cachedLocale != expectedLocale) {
+        qInfo() << "[CACHE LOCALE MISMATCH] PS5 catalog v3 locale" << cachedLocale
+                << "!=" << expectedLocale << ", refetching";
+        QFile::remove(getCacheFilePath(QStringLiteral("ps5_cloud_catalog_v3")));
+        return QString();
+    }
+
+    return cached;
+}
+
 void CloudCatalogBackend::setCachedData(const QString &key, const QJsonDocument &data)
 {
     QString filePath = getCacheFilePath(key);
@@ -971,7 +995,7 @@ void CloudCatalogBackend::fetchPs5CloudCatalog(const QJSValue &callback)
     QString locale = localeSetting.toLower(); // Convert "en-US" to "en-us"
     
     // Check cache first
-    QString cached = getCachedData("ps5_cloud_catalog_v3", CACHE_DURATION_CATALOG);
+    QString cached = getCachedPs5CatalogV3(CACHE_DURATION_CATALOG);
     if (!cached.isEmpty()) {
         qInfo() << "[CACHE] Using cached PS5 cloud catalog";
         QJsonDocument doc = QJsonDocument::fromJson(cached.toUtf8());
@@ -987,7 +1011,9 @@ void CloudCatalogBackend::fetchPs5CloudCatalog(const QJSValue &callback)
     ps5State.plusLibrarySupplementByProductId.clear();
     ps5State.productIdAliases.clear();
     ps5State.totalGamesSeen = 0;
-    ps5State.fetchFailed = false;
+    ps5State.succeededListFetches = 0;
+    ps5State.allPs5ListSucceeded = false;
+    ps5State.failedLists.clear();
     ps5State.pendingListFetches = kPs5ImagicCategoryLists.size();
 
     for (const QString &categoryList : kPs5ImagicCategoryLists) {
@@ -1030,22 +1056,16 @@ void CloudCatalogBackend::handlePs5ImagicListResponse()
     if (networkError || statusCode != 200) {
         qWarning() << "PS5 imagic list fetch failed:" << categoryList
                    << (networkError ? errorString : QString("HTTP %1").arg(statusCode));
-        if (!ps5State.fetchFailed) {
-            ps5State.fetchFailed = true;
-            if (ps5State.callback.isCallable()) {
-                ps5State.callback.call({false,
-                                          QString("Failed to fetch imagic list: %1").arg(categoryList),
-                                          QJSValue()});
-            }
-        }
-    } else if (!ps5State.fetchFailed) {
+        ps5State.failedLists.append(categoryList);
+    } else {
         const QJsonDocument doc = QJsonDocument::fromJson(data);
         if (!doc.isArray()) {
-            ps5State.fetchFailed = true;
-            if (ps5State.callback.isCallable()) {
-                ps5State.callback.call({false, "Invalid response format", QJSValue()});
-            }
+            qWarning() << "PS5 imagic list invalid JSON:" << categoryList;
+            ps5State.failedLists.append(categoryList);
         } else {
+            ps5State.succeededListFetches++;
+            if (categoryList == QLatin1String("all-ps5-list"))
+                ps5State.allPs5ListSucceeded = true;
             mergeImagicListIntoPs5Catalog(categoryList, doc, ps5State.gamesByConceptId,
                                           ps5State.plusLibrarySupplementByProductId,
                                           ps5State.productIdAliases,
@@ -1054,8 +1074,17 @@ void CloudCatalogBackend::handlePs5ImagicListResponse()
     }
 
     ps5State.pendingListFetches--;
-    if (ps5State.pendingListFetches <= 0 && !ps5State.fetchFailed)
-        finalizePs5CloudCatalogFetch();
+    if (ps5State.pendingListFetches <= 0) {
+        if (ps5State.succeededListFetches <= 0) {
+            if (ps5State.callback.isCallable()) {
+                ps5State.callback.call({false,
+                                          QStringLiteral("All imagic lists failed to load"),
+                                          QJSValue()});
+            }
+        } else {
+            finalizePs5CloudCatalogFetch();
+        }
+    }
 }
 
 void CloudCatalogBackend::finalizePs5CloudCatalogFetch()
@@ -1090,6 +1119,8 @@ void CloudCatalogBackend::finalizePs5CloudCatalogFetch()
     }
 
     QJsonObject result;
+    result.insert(QStringLiteral("locale"),
+                  settings ? settings->GetCloudLanguagePSCloud() : QStringLiteral("en-US"));
     result[QStringLiteral("games")] = allGames;
     result[QStringLiteral("total")] = allGames.size();
     result[QStringLiteral("plusLibrarySupplement")] = plusSupplementGames;
@@ -1098,7 +1129,15 @@ void CloudCatalogBackend::finalizePs5CloudCatalogFetch()
 
     const QJsonDocument resultDoc(result);
 
-    setCachedData(QStringLiteral("ps5_cloud_catalog_v3"), resultDoc);
+    if (ps5State.allPs5ListSucceeded)
+        setCachedData(QStringLiteral("ps5_cloud_catalog_v3"), resultDoc);
+
+    QString callbackMessage = QStringLiteral("Success");
+    if (!ps5State.failedLists.isEmpty()) {
+        callbackMessage = QStringLiteral("Some catalog lists failed to load (%1). Catalog may be incomplete.")
+                              .arg(ps5State.failedLists.join(QStringLiteral(", ")));
+        qWarning() << "[API]" << callbackMessage;
+    }
 
     if (crossReferenceState.callback.isCallable() && !crossReferenceState.catalogFetched) {
         crossReferenceState.cloudCatalogGames = allGames;
@@ -1115,7 +1154,7 @@ void CloudCatalogBackend::finalizePs5CloudCatalogFetch()
 
     if (ps5State.callback.isCallable()) {
         const QString jsonStr = QString::fromUtf8(resultDoc.toJson(QJsonDocument::Compact));
-        ps5State.callback.call({true, "Success", QJSValue(jsonStr)});
+        ps5State.callback.call({true, callbackMessage, QJSValue(jsonStr)});
     }
     
     emit catalogUpdated();
@@ -1580,7 +1619,7 @@ void CloudCatalogBackend::getOwnedPs5CloudGames(const QJSValue &callback)
     crossReferenceState.ownedGamesFetched = false;
     
     // Check cache for both catalogs first
-    QString cachedCatalog = getCachedData("ps5_cloud_catalog_v3", CACHE_DURATION_CATALOG);
+    QString cachedCatalog = getCachedPs5CatalogV3(CACHE_DURATION_CATALOG);
     
     QString cachedOwned = getCachedData("ps5_cloud_library", CACHE_DURATION_CATALOG);
     
@@ -1979,7 +2018,9 @@ QString CloudCatalogBackend::getGameLandscapeImageFromCache(const QString &servi
     }
     
     // Load cache - use very large maxAge to never invalidate cache (read-only operation)
-    QString cached = getCachedData(cacheKey, INT_MAX);
+    QString cached = (cacheKey == QLatin1String("ps5_cloud_catalog_v3"))
+                         ? getCachedPs5CatalogV3(INT_MAX)
+                         : getCachedData(cacheKey, INT_MAX);
     if (cached.isEmpty()) {
         qInfo() << "getGameLandscapeImage: Cache not available for" << cacheKey;
         return QString();
@@ -2167,6 +2208,7 @@ void CloudCatalogBackend::processCrossReferenceComplete()
     int productIdMatchCount = 0;
     int entitlementIdMatchCount = 0;
     int supplementMatchCount = 0;
+    QMap<QString, QJsonObject> ownedByKey;
 
     for (const QJsonValue &ownedGame : crossReferenceState.ownedGames) {
         if (!ownedGame.isObject())
@@ -2214,9 +2256,25 @@ void CloudCatalogBackend::processCrossReferenceComplete()
         ownedGameObj.insert(QStringLiteral("productId"), productId);
         ownedGameObj.insert(QStringLiteral("streamingSupported"), !fromSupplement);
 
-        filteredGames.append(ownedGameObj);
+        const QString conceptId = meta.value(QStringLiteral("conceptId")).toString();
+        const QString dedupeKey = !conceptId.isEmpty() ? QStringLiteral("c:") + conceptId
+                                : !productId.isEmpty() ? QStringLiteral("p:") + productId
+                                : !entitlementId.isEmpty() ? QStringLiteral("e:") + entitlementId
+                                : QStringLiteral("u:") + productId + QLatin1Char(':') + entitlementId;
+
+        if (ownedByKey.contains(dedupeKey)) {
+            const QJsonObject existing = ownedByKey.value(dedupeKey);
+            const QString existingEntId = existing.value(QStringLiteral("id")).toString();
+            if (existingEntId.isEmpty() && !entitlementId.isEmpty())
+                ownedByKey.insert(dedupeKey, ownedGameObj);
+        } else {
+            ownedByKey.insert(dedupeKey, ownedGameObj);
+        }
         matchedCount++;
     }
+
+    for (const QJsonObject &gameObj : ownedByKey)
+        filteredGames.append(gameObj);
 
     if (settings && settings->GetLogVerbose()) {
         qInfo() << "[CROSS-REF] Matched games (cloud streamable):" << matchedCount;
@@ -2243,6 +2301,19 @@ void CloudCatalogBackend::processCrossReferenceComplete()
     crossReferenceState.productIdAliases.clear();
     crossReferenceState.catalogFetched = false;
     crossReferenceState.ownedGamesFetched = false;
+}
+
+void CloudCatalogBackend::invalidatePs5CatalogCache()
+{
+    for (const QString &key :
+         {QStringLiteral("ps5_cloud_catalog_v3"), QStringLiteral("ps5_cloud_catalog_v2"),
+          QStringLiteral("ps5_cloud_catalog")}) {
+        const QString path = getCacheFilePath(key);
+        if (QFile::exists(path)) {
+            QFile::remove(path);
+            qInfo() << "[CACHE INVALIDATED] Removed PS5 cloud catalog cache:" << key;
+        }
+    }
 }
 
 void CloudCatalogBackend::invalidateCache()

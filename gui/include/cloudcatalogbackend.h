@@ -54,6 +54,7 @@ public:
     // Utility methods
     Q_INVOKABLE void clearCache();
     Q_INVOKABLE void invalidateCache();
+    Q_INVOKABLE void invalidatePs5CatalogCache();
     Q_INVOKABLE QString getCachedData(const QString &key, int maxAge);
     Q_INVOKABLE QString getGameLandscapeImageFromCache(const QString &serviceType, const QString &gameIdentifier);
 
@@ -99,7 +100,9 @@ private:
     struct Ps5FetchState {
         QJSValue callback;
         int pendingListFetches = 0;
-        bool fetchFailed = false;
+        int succeededListFetches = 0;
+        bool allPs5ListSucceeded = false;
+        QStringList failedLists;
         QMap<QString, QJsonObject> gamesByConceptId;
         QMap<QString, QJsonObject> plusLibrarySupplementByProductId;
         QMap<QString, QString> productIdAliases; // alternate imagic productId -> canonical browse productId
@@ -135,6 +138,7 @@ private:
     
     // Helper methods
     void setCachedData(const QString &key, const QJsonDocument &data);
+    QString getCachedPs5CatalogV3(int maxAge);
     QString getCacheFilePath(const QString &key);
     void ensureCacheDirectory();
     void fetchPsnowCategory(int categoryIndex);

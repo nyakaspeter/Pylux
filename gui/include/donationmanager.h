@@ -31,6 +31,8 @@ public:
 
     bool isEnabled() const;
     bool showDonationPrompt() const { return m_showPrompt; }
+    bool isOfferScheduled() const { return m_delayTimer && m_delayTimer->isActive(); }
+    bool paywallActiveOrScheduled() const { return showDonationPrompt() || isOfferScheduled(); }
     void setShowDonationPrompt(bool show);
     bool isDonated() const { return m_donated; }
     QString paymentUrl() const { return m_paymentUrl; }

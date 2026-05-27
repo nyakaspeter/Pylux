@@ -127,6 +127,7 @@ class CloudPlayViewModel(
 						{
 							allGames = result.data
 							Log.i(TAG, "Successfully loaded ${allGames.size} owned PS5 games")
+							repository.lastCatalogFetchWarning?.let { _warning.value = it }
 							applySearchFilter()
 						}
 						is PsnResult.Error ->
@@ -146,6 +147,7 @@ class CloudPlayViewModel(
 						{
 							allGames = result.data
 							Log.i(TAG, "Successfully loaded ${allGames.size} PS5 games")
+							repository.lastCatalogFetchWarning?.let { _warning.value = it }
 							applySearchFilter()
 						}
 						is PsnResult.Error ->
@@ -265,6 +267,8 @@ class CloudPlayViewModel(
 
 	private fun updateLocaleWarningIfNeeded()
 	{
+		if (!_warning.value.isNullOrEmpty())
+			return
 		if (!preferences.isCloudLanguageConfigured())
 			_warning.value = CloudLocale.unconfiguredWarning()
 	}

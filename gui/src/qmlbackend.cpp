@@ -141,11 +141,14 @@ QmlBackend::QmlBackend(Settings *settings, QmlMainWindow *window, SteamworksWrap
     qmlRegisterSingletonInstance(uri, 1, 0, "DonationManager", donationManager);
 #ifdef CHIAKI_IS_MAC_APPSTORE
     // Mac App Store: arm the SKStoreReviewController prompt for the next active transition.
-    auto *appReviewManager = new AppReviewManager(settings, this);
+    auto *appReviewManager = new AppReviewManager(settings, donationManager, this);
     appReviewManager->armOnNextActivation();
 #endif
     cloud_streaming_backend = new CloudStreamingBackend(settings, this);
     cloud_catalog_backend = new CloudCatalogBackend(settings, this);
+    connect(settings_qml, &QmlSettings::cloudLanguagePSCloudChanged, this, [this]() {
+        cloud_catalog_backend->invalidatePs5CatalogCache();
+    });
     
     // Connect cloud streaming backend to register sessions
     connect(cloud_streaming_backend, &CloudStreamingBackend::sessionCreated, this, 

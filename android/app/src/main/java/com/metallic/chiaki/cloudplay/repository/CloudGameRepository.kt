@@ -61,6 +61,9 @@ class CloudGameRepository(
 			if (!exists()) mkdirs()
 		}
 	}
+
+	var lastCatalogFetchWarning: String? = null
+		private set
 	
 	/**
 	 * Fetch PSNow catalog with caching
@@ -119,8 +122,11 @@ class CloudGameRepository(
 
 				val catalog = (if (!forceRefresh) loadCachedPs5CatalogV3(stored) else null)
 					?: run {
+						lastCatalogFetchWarning = null
 						val fetched = pscloudCatalogService.fetchPs5CloudCatalog(locale)
-						cachePs5CatalogV3(fetched, stored)
+						if (fetched.shouldCacheV3)
+							cachePs5CatalogV3(fetched, stored)
+						lastCatalogFetchWarning = fetched.catalogFetchWarning
 						fetched
 					}
 
@@ -187,8 +193,11 @@ class CloudGameRepository(
 
 				val catalog = (if (!forceRefresh) loadCachedPs5CatalogV3(stored) else null)
 					?: run {
+						lastCatalogFetchWarning = null
 						val fetched = pscloudCatalogService.fetchPs5CloudCatalog(locale)
-						cachePs5CatalogV3(fetched, stored)
+						if (fetched.shouldCacheV3)
+							cachePs5CatalogV3(fetched, stored)
+						lastCatalogFetchWarning = fetched.catalogFetchWarning
 						fetched
 					}
 
