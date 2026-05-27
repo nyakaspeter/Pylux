@@ -81,13 +81,28 @@ jobs:
 
       - name: Install build dependencies
         run: |
+          retry() {
+            local attempts="$1"
+            shift
+            local n=1
+            until "$@"; do
+              if [ "$n" -ge "$attempts" ]; then
+                echo "Command failed after $n attempts: $*"
+                return 1
+              fi
+              local sleep_s=$((n * 15))
+              echo "Attempt $n failed; retrying in ${sleep_s}s: $*"
+              sleep "$sleep_s"
+              n=$((n + 1))
+            done
+          }
           ${{ matrix.arch == 'ARM64' && 'brew uninstall pkgconfig || true' || '' }}
-          brew install ${{ matrix.arch == 'x86_64' && '--force' || '' }} \
+          retry 4 brew install ${{ matrix.arch == 'x86_64' && '--force' || '' }} \
             qt@6 ffmpeg pkgconfig opus openssl cmake ninja nasm sdl2 \
             protobuf@29 speexdsp libplacebo wget python-setuptools json-c miniupnpc \
             ${{ matrix.arch == 'x86_64' && '|| true' || '' }}
           pip3 install --user --break-system-packages 'protobuf>=5,<6'
-          brew link qt@6 --overwrite 2>/dev/null || true
+          retry 3 brew link qt@6 --overwrite 2>/dev/null || true
 
       - name: Configure and build
         run: |
@@ -369,7 +384,22 @@ jobs:
           PYLUX_SUBMIT_FOR_REVIEW: ${{ github.ref_name == 'master' && 'true' || 'false' }}
           PYLUX_TESTFLIGHT_EXTERNAL_BETA: ${{ github.ref_name == 'release/beta' && 'true' || 'false' }}
         run: |
-          brew install fastlane
+          retry() {
+            local attempts="$1"
+            shift
+            local n=1
+            until "$@"; do
+              if [ "$n" -ge "$attempts" ]; then
+                echo "Command failed after $n attempts: $*"
+                return 1
+              fi
+              local sleep_s=$((n * 15))
+              echo "Attempt $n failed; retrying in ${sleep_s}s: $*"
+              sleep "$sleep_s"
+              n=$((n + 1))
+            done
+          }
+          retry 4 brew install fastlane
           export PYLUX_PKG_PATH="${{ env.PKG_PATH }}"
           fastlane upload_pylux_pkg
 
