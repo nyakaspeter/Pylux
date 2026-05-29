@@ -51,8 +51,13 @@ enum PsCloudOwnership {
             supplementMap[game.id] = game
         }
 
+        let browseStableKey = buildStableKeyIndex(publicCatalog)
+        let supplementStableKey = buildStableKeyIndex(plusLibrarySupplement)
+
         var byKey: [String: CloudGame] = [:]
         for ent in filteredEntitlements {
+            let stable = productIdStableKey(ent.productId)
+            let skipStableDemo = ent.name.localizedCaseInsensitiveContains("demo")
             let meta: CloudGame?
             if !ent.productId.isEmpty, let g = catalogMap[ent.productId] {
                 meta = g
@@ -60,6 +65,10 @@ enum PsCloudOwnership {
                 meta = g
             } else if !ent.productId.isEmpty, ent.id == ent.productId,
                       let g = supplementMap[ent.productId] {
+                meta = g
+            } else if let stable, !skipStableDemo, let g = browseStableKey[stable] {
+                meta = g
+            } else if let stable, !skipStableDemo, let g = supplementStableKey[stable] {
                 meta = g
             } else {
                 meta = nil
@@ -105,6 +114,30 @@ enum PsCloudOwnership {
             return candidate
         }
         return existing
+    }
+
+    /// Tokenize on '-' and '_'; identity is all tokens except the last (store SKU).
+    private static func productIdStableKey(_ productId: String) -> String? {
+        guard !productId.isEmpty else { return nil }
+        var tokens: [String] = []
+        for dashPart in productId.split(separator: "-") {
+            for token in dashPart.split(separator: "_") where !token.isEmpty {
+                tokens.append(String(token))
+            }
+        }
+        guard tokens.count >= 2 else { return nil }
+        return tokens.dropLast().joined(separator: "|")
+    }
+
+    private static func buildStableKeyIndex(_ games: [CloudGame]) -> [String: CloudGame] {
+        var index: [String: CloudGame] = [:]
+        for game in games {
+            guard let key = productIdStableKey(game.id) else { continue }
+            if index[key] == nil {
+                index[key] = game
+            }
+        }
+        return index
     }
 
     static func mergeOwnedIntoBrowseCatalog(

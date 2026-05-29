@@ -912,6 +912,39 @@ static QString ps5CloudConceptKey(const QJsonObject &gameObj)
     return gameObj.value(QStringLiteral("productId")).toString();
 }
 
+static QString ps5CloudProductIdStableKey(const QString &productId)
+{
+    if (productId.isEmpty())
+        return QString();
+    QStringList tokens;
+    const QStringList dashParts = productId.split(QLatin1Char('-'), Qt::SkipEmptyParts);
+    for (const QString &dashPart : dashParts) {
+        const QStringList underscoreParts = dashPart.split(QLatin1Char('_'), Qt::SkipEmptyParts);
+        for (const QString &token : underscoreParts)
+            tokens.append(token);
+    }
+    if (tokens.size() < 2)
+        return QString();
+    tokens.removeLast();
+    return tokens.join(QLatin1Char('|'));
+}
+
+static QMap<QString, QJsonObject> buildStableKeyIndex(const QJsonArray &games)
+{
+    QMap<QString, QJsonObject> index;
+    for (const QJsonValue &game : games) {
+        if (!game.isObject())
+            continue;
+        const QJsonObject gameObj = game.toObject();
+        const QString productId = gameObj.value(QStringLiteral("productId")).toString();
+        const QString key = ps5CloudProductIdStableKey(productId);
+        if (key.isEmpty() || index.contains(key))
+            continue;
+        index.insert(key, gameObj);
+    }
+    return index;
+}
+
 static QJsonObject productIdAliasesToJson(const QMap<QString, QString> &aliases)
 {
     QJsonObject obj;
@@ -2196,6 +2229,11 @@ void CloudCatalogBackend::processCrossReferenceComplete()
         }
     }
 
+    const QMap<QString, QJsonObject> browseStableKey =
+        buildStableKeyIndex(crossReferenceState.cloudCatalogGames);
+    const QMap<QString, QJsonObject> supplementStableKey =
+        buildStableKeyIndex(crossReferenceState.plusLibrarySupplement);
+
     if (settings && settings->GetLogVerbose()) {
         qInfo() << "[CROSS-REF] Cloud catalog map size:" << cloudCatalogMap.size();
         qInfo() << "[CROSS-REF] Product ID aliases:" << crossReferenceState.productIdAliases.size();
@@ -2208,6 +2246,8 @@ void CloudCatalogBackend::processCrossReferenceComplete()
     int productIdMatchCount = 0;
     int entitlementIdMatchCount = 0;
     int supplementMatchCount = 0;
+    int stableKeyBrowseMatchCount = 0;
+    int stableKeySupplementMatchCount = 0;
     QMap<QString, QJsonObject> ownedByKey;
 
     for (const QJsonValue &ownedGame : crossReferenceState.ownedGames) {
@@ -2217,6 +2257,10 @@ void CloudCatalogBackend::processCrossReferenceComplete()
         QJsonObject ownedGameObj = ownedGame.toObject();
         const QString productId = ownedGameObj.value(QStringLiteral("product_id")).toString();
         const QString entitlementId = ownedGameObj.value(QStringLiteral("id")).toString();
+        const QString entName = ownedGameObj.value(QStringLiteral("game_meta")).toObject()
+                                    .value(QStringLiteral("name")).toString();
+        const bool skipStableDemo = entName.contains(QStringLiteral("demo"), Qt::CaseInsensitive);
+        const QString stableKey = ps5CloudProductIdStableKey(productId);
 
         QJsonObject meta;
         bool found = false;
@@ -2236,6 +2280,16 @@ void CloudCatalogBackend::processCrossReferenceComplete()
             found = true;
             fromSupplement = true;
             supplementMatchCount++;
+        } else if (!stableKey.isEmpty() && !skipStableDemo && browseStableKey.contains(stableKey)) {
+            meta = browseStableKey.value(stableKey);
+            found = true;
+            stableKeyBrowseMatchCount++;
+        } else if (!stableKey.isEmpty() && !skipStableDemo
+                   && supplementStableKey.contains(stableKey)) {
+            meta = supplementStableKey.value(stableKey);
+            found = true;
+            fromSupplement = true;
+            stableKeySupplementMatchCount++;
         }
 
         if (!found)
@@ -2281,6 +2335,8 @@ void CloudCatalogBackend::processCrossReferenceComplete()
         qInfo() << "[CROSS-REF]   By product_id:" << productIdMatchCount;
         qInfo() << "[CROSS-REF]   By entitlement id (fallback):" << entitlementIdMatchCount;
         qInfo() << "[CROSS-REF]   By Plus library supplement:" << supplementMatchCount;
+        qInfo() << "[CROSS-REF]   By stable product id key (browse):" << stableKeyBrowseMatchCount;
+        qInfo() << "[CROSS-REF]   By stable product id key (supplement):" << stableKeySupplementMatchCount;
     }
 
     QJsonObject result;

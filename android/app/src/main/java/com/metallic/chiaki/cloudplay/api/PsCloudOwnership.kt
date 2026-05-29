@@ -63,10 +63,14 @@ object PsCloudOwnership
 			catalogMap[canonical]?.let { catalogMap[alias] = it }
 		}
 		val supplementMap = catalogMapFirstWins(plusLibrarySupplement)
+		val browseStableKey = buildStableKeyIndex(publicCatalog)
+		val supplementStableKey = buildStableKeyIndex(plusLibrarySupplement)
 		val byKey = linkedMapOf<String, CloudGame>()
 
 		for (ent in filteredEntitlements)
 		{
+			val stable = productIdStableKey(ent.productId)
+			val skipStableDemo = ent.name.contains("demo", ignoreCase = true)
 			val meta = when {
 				ent.productId.isNotEmpty() && catalogMap.containsKey(ent.productId) ->
 					catalogMap[ent.productId]
@@ -75,6 +79,10 @@ object PsCloudOwnership
 				ent.productId.isNotEmpty() && ent.id == ent.productId
 					&& supplementMap.containsKey(ent.productId) ->
 					supplementMap[ent.productId]
+				stable != null && !skipStableDemo && browseStableKey.containsKey(stable) ->
+					browseStableKey[stable]
+				stable != null && !skipStableDemo && supplementStableKey.containsKey(stable) ->
+					supplementStableKey[stable]
 				else -> null
 			} ?: continue
 
@@ -119,6 +127,37 @@ object PsCloudOwnership
 				map[game.productId] = game
 		}
 		return map
+	}
+
+	/** Tokenize on '-' and '_'; identity is all tokens except the last (store SKU). */
+	private fun productIdStableKey(productId: String): String?
+	{
+		if (productId.isEmpty())
+			return null
+		val tokens = mutableListOf<String>()
+		for (dashPart in productId.split('-'))
+		{
+			for (token in dashPart.split('_'))
+			{
+				if (token.isNotEmpty())
+					tokens.add(token)
+			}
+		}
+		if (tokens.size < 2)
+			return null
+		return tokens.dropLast(1).joinToString("|")
+	}
+
+	private fun buildStableKeyIndex(games: List<CloudGame>): Map<String, CloudGame>
+	{
+		val index = linkedMapOf<String, CloudGame>()
+		for (game in games)
+		{
+			val key = productIdStableKey(game.productId) ?: continue
+			if (key !in index)
+				index[key] = game
+		}
+		return index
 	}
 
 	fun mergeOwnedIntoBrowseCatalog(
