@@ -509,7 +509,7 @@ class CloudPlayFragment : Fragment()
 		
 		// Update section
 		viewModel.setCurrentSection("psnow")
-		adapter.showOwnershipBadge = false
+		adapter.showOwnershipBadge = true  // owned/not-owned shown in Catalog too
 		binding.sortOptionLayout.visibility = android.view.View.VISIBLE
 		binding.filterOptionLayout.visibility = android.view.View.VISIBLE
 		updateSortButtonText()
@@ -1120,9 +1120,7 @@ class CloudPlayFragment : Fragment()
 	private fun onGameClicked(game: CloudGame)
 	{
 		val isPscloud = game.serviceType == "pscloud"
-		val isAllGamesFilter = !viewModel.preferences.getPsCloudFilterOwned()
-		
-		if (isPscloud && isAllGamesFilter && !game.isOwned)
+				if (isPscloud && !game.isOwned)
 		{
 			// Show dialog to add game to library
 			showAddToLibraryDialog(game)
@@ -1341,9 +1339,11 @@ class CloudPlayFragment : Fragment()
 			try
 			{
 				val backend = CloudStreamingBackend(requireContext(), viewModel.preferences)
+				// Route by the title-id platform: PS4 catalog titles go through Kamaji (psnow) to
+				// acquire the streaming entitlement; PS5 streams directly (pscloud).
 				val result = backend.startCompleteCloudSession(
-					serviceType = game.serviceType,
-					gameIdentifier = PsCloudOwnership.streamingIdentifier(game),
+					serviceType = PsCloudOwnership.streamServiceType(game),
+					gameIdentifier = PsCloudOwnership.streamIdentifier(game),
 					gameName = game.name,
 					npssoToken = npssoToken,
 					onProgress = { message ->

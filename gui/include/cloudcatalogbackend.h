@@ -107,6 +107,12 @@ private:
         QMap<QString, QJsonObject> plusLibrarySupplementByProductId;
         QMap<QString, QString> productIdAliases; // alternate imagic productId -> canonical browse productId
         int totalGamesSeen = 0;
+        // Store-locale fallback: Sony serves a fixed set of language-COUNTRY locales.
+        // The country is always valid but the language may not be (e.g. hu-HU 404s,
+        // en-HU works). We try the session locale, then en-COUNTRY, then en-US.
+        QStringList localeChain;
+        int localeTierIndex = 0;
+        QString activeLocale; // canonical "ll-CC" form for the tier currently being fetched
     } ps5State;
     
     // Owned games fetching state
@@ -132,7 +138,9 @@ private:
         QJsonArray plusLibrarySupplement;
         QJsonArray ownedGames;
         QMap<QString, QString> productIdAliases;
-        QMap<QString, QStringList> componentIdsByProductId; // product_id -> all sibling entitlement ids (full list)
+        // Bundle product_id -> its component entitlement ids, for bundle-sibling matching (from
+        // upstream PR #15): a bundle entitlement (e.g. RE7 Gold) expands to its component games.
+        QMap<QString, QStringList> componentIdsByProductId;
         bool catalogFetched;
         bool ownedGamesFetched;
     } crossReferenceState;
@@ -153,6 +161,7 @@ private:
     void handlePsnowSessionResponse();
     void handlePsnowStoresResponse();
     void handlePsnowRootContainerResponse();
+    void startPs5ImagicListFetch(); // fires the six imagic list requests for ps5State.activeLocale
     void executeGameDetailsFetch(const QString &productId);
     QJsonArray filterStreamingSupportedGames(const QJsonArray &games);
     QJsonArray filterOwnedPs5Games(const QJsonArray &entitlements);

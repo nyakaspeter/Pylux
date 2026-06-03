@@ -412,6 +412,44 @@ class PSKamajiSession(
 				}
 			}
 			
+
+			// Full-game fallback: PS Plus catalog titles have no license_type==4 entitlement; their
+			// full-game entitlement is license_type 0 with packageType "*GD". Prefer the one whose id
+			// matches the requested product's title id so cross-gen picks the consistent platform.
+			if (streamingEntitlementId.isEmpty())
+			{
+				val requestedTitleId = productId.split("-").getOrNull(1)?.split("_")?.firstOrNull() ?: ""
+				fun pickFullGameEntitlement(skuObj: JSONObject, requireTitleMatch: Boolean): Boolean
+				{
+					val ents = skuObj.optJSONArray("entitlements") ?: return false
+					for (j in 0 until ents.length())
+					{
+						val ent = ents.getJSONObject(j)
+						val entId = ent.optString("id", "")
+						val pkg = ent.optString("packageType", "")
+						if (entId.isEmpty() || !pkg.endsWith("GD")) continue
+						if (requireTitleMatch && requestedTitleId.isNotEmpty() && !entId.contains(requestedTitleId)) continue
+						streamingEntitlementId = entId
+						sku = skuObj.optString("id", "")
+						Log.i(TAG, "Found full-game Entitlement ID (PS Plus catalog fallback): $streamingEntitlementId packageType: $pkg titleMatch: $requireTitleMatch")
+						return true
+					}
+					return false
+				}
+				for (requireTitleMatch in listOf(true, false))
+				{
+					if (json.has("default_sku") && pickFullGameEntitlement(json.getJSONObject("default_sku"), requireTitleMatch)) break
+					if (streamingEntitlementId.isEmpty() && json.has("skus"))
+					{
+						val skus = json.getJSONArray("skus")
+						for (i in 0 until skus.length())
+						{
+							if (pickFullGameEntitlement(skus.getJSONObject(i), requireTitleMatch)) break
+						}
+					}
+					if (streamingEntitlementId.isNotEmpty()) break
+				}
+			}
 			// Try to extract platform from playable_platform
 			if (json.has("playable_platform"))
 			{

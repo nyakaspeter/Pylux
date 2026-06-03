@@ -161,33 +161,56 @@ final class PSKamajiSession {
         var sku = ""
         var detectedPlatform = "ps4"
 
-        // Check default_sku for streaming entitlements (license_type == 4)
-        if let defaultSku = json["default_sku"] as? [String: Any],
-           let ents = defaultSku["entitlements"] as? [[String: Any]] {
+        // PS Now streaming entitlements have license_type == 4. Check default_sku, then skus.
+        func pickStreamingEntitlement(_ skuObj: [String: Any]) -> Bool {
+            guard let ents = skuObj["entitlements"] as? [[String: Any]] else { return false }
             for ent in ents {
                 if (ent["license_type"] as? Int) == 4, let id = ent["id"] as? String, !id.isEmpty {
-                    eid = id; sku = defaultSku["id"] as? String ?? ""; break
+                    eid = id; sku = skuObj["id"] as? String ?? ""; return true
                 }
             }
+            return false
         }
-
-        // Fallback to skus array
+        if let defaultSku = json["default_sku"] as? [String: Any] { _ = pickStreamingEntitlement(defaultSku) }
         if eid.isEmpty, let skus = json["skus"] as? [[String: Any]] {
-            for skuObj in skus {
-                if let ents = skuObj["entitlements"] as? [[String: Any]] {
-                    for ent in ents {
-                        if (ent["license_type"] as? Int) == 4, let id = ent["id"] as? String, !id.isEmpty {
-                            eid = id; sku = skuObj["id"] as? String ?? ""; break
-                        }
-                    }
+            for skuObj in skus where pickStreamingEntitlement(skuObj) { break }
+        }
+
+        // Full-game fallback: PS Plus catalog titles have no license_type==4 entitlement; their
+        // full-game entitlement is license_type 0 with packageType "*GD". Prefer the one whose id
+        // matches the requested product's title id so cross-gen picks the consistent platform.
+        if eid.isEmpty {
+            let requestedTitleId: String = {
+                let dash = productId.split(separator: "-")
+                guard dash.count >= 2 else { return "" }
+                return String(dash[1].split(separator: "_").first ?? "")
+            }()
+            func pickFullGameEntitlement(_ skuObj: [String: Any], requireTitleMatch: Bool) -> Bool {
+                guard let ents = skuObj["entitlements"] as? [[String: Any]] else { return false }
+                for ent in ents {
+                    guard let id = ent["id"] as? String, !id.isEmpty else { continue }
+                    let pkg = ent["packageType"] as? String ?? ""
+                    guard pkg.hasSuffix("GD") else { continue }
+                    if requireTitleMatch, !requestedTitleId.isEmpty, !id.contains(requestedTitleId) { continue }
+                    eid = id; sku = skuObj["id"] as? String ?? ""; return true
                 }
-                if !eid.isEmpty { break }
+                return false
+            }
+            for requireTitleMatch in [true, false] {
+                if let defaultSku = json["default_sku"] as? [String: Any],
+                   pickFullGameEntitlement(defaultSku, requireTitleMatch: requireTitleMatch) { break }
+                if let skus = json["skus"] as? [[String: Any]] {
+                    var found = false
+                    for skuObj in skus where pickFullGameEntitlement(skuObj, requireTitleMatch: requireTitleMatch) { found = true; break }
+                    if found { break }
+                }
             }
         }
 
-        // Detect platform
+        // Detect platform (PS5 > PS4 > PS3)
         if let platforms = json["playable_platform"] as? [String] {
-            if platforms.contains(where: { $0.localizedCaseInsensitiveContains("PS4") }) { detectedPlatform = "ps4" }
+            if platforms.contains(where: { $0.localizedCaseInsensitiveContains("PS5") }) { detectedPlatform = "ps5" }
+            else if platforms.contains(where: { $0.localizedCaseInsensitiveContains("PS4") }) { detectedPlatform = "ps4" }
             else if platforms.contains(where: { $0.localizedCaseInsensitiveContains("PS3") }) { detectedPlatform = "ps3" }
         }
 
