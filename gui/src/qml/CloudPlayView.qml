@@ -476,13 +476,16 @@ Pane {
                 // catalog entry's own productId (e.g. ...GODOFWARN, the "N" variant) is what Kamaji
                 // converts to a streaming entitlement -- so leave the catalog productId intact.
                 //
-                // Override UNCONDITIONALLY for PS5 (matching the iOS/Android merge, which always copy
+                // Override unconditionally for PS5 (matching the iOS/Android merge, which always copy
                 // storeProductId): the catalog card carries one fixed SKU per concept, but you can only
                 // stream the edition you actually own. When they differ -- e.g. the catalog SKU is a
                 // disc-upgrade you can't stream and the cross-reference rescued you to the owned full
-                // game -- the catalog card already has a (wrong) product_id, so a guarded assignment
-                // would keep the unstreamable id. The owned product id must win.
-                if (ownedProductId && ps5CloudPlatformToken(ownedProductId) === "ps5") {
+                // game (Horizon: PPSA01521 -> PPSA17903) -- the catalog card's product_id is the wrong
+                // (unstreamable) one, so the owned product id must win.
+                // NOTE: ps5CloudPlatformToken takes a GAME OBJECT, not a product-id string -- passing
+                // the string here made it always return "" so this override never ran (the bug that
+                // broke the "all" view while the "owned" view, which uses the cross-ref directly, worked).
+                if (ownedProductId && ps5CloudPlatformToken(ownedGame) === "ps5") {
                     existing.product_id = ownedProductId;
                     existing.productId = ownedProductId;
                 }
